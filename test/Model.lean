@@ -1,5 +1,7 @@
 import LeanProfiler
 
+set_option profiler.rewrite true
+
 def tensorScale (xs : List Float) (k : Float) : List Float :=
   xs.map (· * k)
 

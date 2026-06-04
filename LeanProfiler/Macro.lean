@@ -20,7 +20,6 @@ partial def syntaxContainsIdent (stx : Syntax) (names : List Name) : Bool :=
   else
     stx.getArgs.any (syntaxContainsIdent · names)
 
-/-- `register_label_attr profile` uses `Parser.Attr.profile`, not `Attr.simple`. -/
 def profileAttrKind : Name := `Parser.Attr.profile
 
 partial def syntaxHasProfileAttr (stx : Syntax) : Bool :=
@@ -37,52 +36,38 @@ def hasProfileAttr (modifiers : Syntax) : Bool :=
 def modifiersContain (modifiers : Syntax) (kind : SyntaxNodeKind) : Bool :=
   modifiers.find? (·.isOfKind kind) |>.isSome
 
-/-- Return type is `IO` / `EIO` / `BaseIO` (safe for `withProfileWhenActive`). -/
 def isIOReturnShape (sig : Syntax) : Bool :=
   syntaxContainsIdent sig monadicTypeNames
 
 def isSkippedReturnShape (sig : Syntax) : Bool :=
   syntaxContainsIdent sig skippedReturnNames
 
-/-- `@[profile]` on a `do` body whose return is inferred `IO` (signature may omit `IO` ident). -/
 def isProfileIODo (modifiers : Syntax) (sig body : Syntax) : Bool :=
   hasProfileAttr modifiers && body.isOfKind ``Parser.Term.do && !isSkippedReturnShape sig
 
-/-- `@[profile]` or legacy `profiler.instrument` on this file. -/
-def shouldInstrument (opts : Options) (modifiers : Syntax) : Bool :=
-  hasProfileAttr modifiers || profiler.instrument.get opts
+def shouldRewrite (opts : Options) (modifiers : Syntax) : Bool :=
+  hasProfileAttr modifiers && profiler.rewrite.get opts
 
-/-- Fully qualified name for the def being declared (avoids `_root_.abs`-style collisions). -/
 def elaboratedDeclName (shortName : Name) : CommandElabM Name := do
   let ns ← getCurrNamespace
   pure (ns.append shortName)
 
 def rootIdent (nameIdent : Syntax) (shortName : Name) : CommandElabM (TSyntax `ident) := do
   let full ← elaboratedDeclName shortName
-  let rootName := `_root_ ++ full
-  pure ⟨mkIdentFrom nameIdent rootName⟩
+  pure ⟨mkIdentFrom nameIdent (`_root_ ++ full)⟩
 
 def profileLabel (shortName : Name) : CommandElabM (TSyntax `term) := do
   let full ← elaboratedDeclName shortName
   pure ⟨Syntax.mkStrLit full.toString⟩
 
-def wrapProfiledDef (opts : Options) (nameIdent : Syntax) (declName : Name) (sig : Syntax)
-    (body : Syntax) (ioWrap : Bool) : CommandElabM Unit := do
+def wrapProfiledDef (nameIdent : Syntax) (declName : Name) (sig : Syntax) (body : Syntax) :
+    CommandElabM Unit := do
   let nameIdentT ← rootIdent nameIdent declName
   let sigT : TSyntax `Lean.Parser.Command.optDeclSig := ⟨sig⟩
   let nameStr ← profileLabel declName
-  let nameStrTerm : TSyntax `term := nameStr
   let bodyTerm : TSyntax `term := ⟨body⟩
-  let bodyWrapper ←
-    if ioWrap then
-      `(withProfileWhenActive $nameStrTerm $bodyTerm)
-    else
-      `(profilePure $nameStrTerm $bodyTerm)
   let newCmd ←
-    if profiler.pure.get opts then
-      `(unsafe def $nameIdentT:ident $sigT:optDeclSig := $bodyWrapper)
-    else
-      `(def $nameIdentT:ident $sigT:optDeclSig := $bodyWrapper)
+    `(def $nameIdentT:ident $sigT:optDeclSig := withProfile $nameStr $bodyTerm)
   autoInstrumentGuard.set true
   elabCommand newCmd
   autoInstrumentGuard.set false
@@ -93,7 +78,7 @@ meta def elabAutoInstrument : CommandElab := fun stx => do
   if guard then throwUnsupportedSyntax
   let opts ← getOptions
   let modifiers := stx[0]
-  unless shouldInstrument opts modifiers do
+  unless shouldRewrite opts modifiers do
     throwUnsupportedSyntax
   let declBody := stx[1]
   unless declBody.isOfKind ``Lean.Parser.Command.definition do
@@ -110,18 +95,8 @@ meta def elabAutoInstrument : CommandElab := fun stx => do
   let declName := nameIdent.getId
   if (`LeanProfiler).isPrefixOf declName then
     throwUnsupportedSyntax
-  unless hasProfileAttr modifiers do
-    if declName == `main then
-      throwUnsupportedSyntax
-  if profiler.instrument.get opts && !hasProfileAttr modifiers &&
-      body.isOfKind ``Parser.Term.do && !isIOReturnShape sig && !profiler.pure.get opts then
-    throwUnsupportedSyntax
   if isIOReturnShape sig || isProfileIODo modifiers sig body then
-    wrapProfiledDef opts nameIdent declName sig body (ioWrap := true)
-  else if profiler.pure.get opts then
-    wrapProfiledDef opts nameIdent declName sig body (ioWrap := false)
-  else if hasProfileAttr modifiers then
-    logWarning m!"@[profile] on `{declName}`: enable `set_option profiler.pure true` for pure defs"
-    throwUnsupportedSyntax
+    wrapProfiledDef nameIdent declName sig body
   else
+    logWarning m!"@[profile] on `{declName}`: only IO `def`s are rewritten; use `withProfile` manually"
     throwUnsupportedSyntax

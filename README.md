@@ -1,70 +1,33 @@
 # LeanProfiler
 
-Time **only the functions you mark**, with **one** entry wrapper.
+Time regions with `withProfile`, optionally auto-wrap `@[profile]` IO defs, then `printSummary`.
 
-## Recipe (3 steps)
-
-**1. Lake**
-
-```toml
-[[require]]
-name = "LeanProfiler"
-git = "https://github.com/wadkisson/LeanProfiler"
-rev = "main"
-```
-
-**2. Tag hot `def`s** (same file as the implementation):
+## Manual profiling
 
 ```lean
 import LeanProfiler
 
+def main : IO Unit := do
+  withProfile "load" do
+    ...
+  withProfile "train" do
+    ...
+  printSummary
+```
+
+## Optional auto-rewrite
+
+```lean
+set_option profiler.rewrite true
+
 @[profile]
-def forward (input : List Float) : IO (List Float) := do
+def trainStep : IO Unit := do
   ...
 ```
 
-**3. Open scope at entry and print**
-
-```lean
-def main : IO UInt32 := profileRun do
-  train
-  printSummary
-  pure 0
-```
-
-Optional: `exportProfile "trace.json"` then open at [ui.perfetto.dev](https://ui.perfetto.dev).
-
-## How it works
-
-| Piece | Role |
-|-------|------|
-| `profileRun` | One call at `main` (or your CLI entry). Sets `profilingScopeDepth > 0` for the whole run. |
-| `@[profile]` | Compile-time wrap on **that def only** → `withProfileWhenActive "Full.Name" …` |
-| `withProfile "label"` | Manual region inside a big `do` (training loop, etc.) |
-| `printSummary` | Aggregated self/total time table |
-
-While the scope is **off**, `@[profile]` defs are a single ref check per call. Inside `profileRun`, they record timings.
-
-**Not wrapped:** `Except` / `Result` parsers, `partial` defs, anything without `@[profile]` (unless you enable legacy `set_option profiler.instrument true` on the whole file).
-
-## Pure tensor code
-
-```lean
-set_option profiler.pure true
-
-@[profile]
-def matmul ... := ...
-```
-
-## Legacy file-wide mode
-
-```lean
-set_option profiler.instrument true  -- every IO def in this file
-```
-
-Prefer `@[profile]` on 5–15 hot defs instead of instrumenting hundreds of ops.
+With `profiler.rewrite` on, the macro wraps that def’s body in `withProfile "Full.Name" …`. Without it, `@[profile]` is only a label (no rewrite).
 
 ## Limits
 
-- Simple `def := term` shapes only.
-- ~tens of µs per recorded call — profile layers, not every tiny helper.
+- IO `def`s only (`Except` / `Result` / `partial` are skipped).
+- Simple `def := …` shapes only.

@@ -1,8 +1,8 @@
 import LeanProfiler
 
-set_option profiler.instrument true
+set_option profiler.rewrite true
 
-/-- Must not be auto-wrapped (`Except` + `do` is skipped). -/
+/-- Must not be rewritten (`Except` return is skipped). -/
 def parseFlags (args : List String) : Except String (Nat × List String) := do
   match args with
   | [] => throw "missing flag"

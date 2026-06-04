@@ -13,7 +13,6 @@ def padLeft (s : String) (width : Nat) : String :=
   if s.length >= width then s
   else String.ofList (List.replicate (width - s.length) ' ') ++ s
 
-/-- Summary column width; long qualified names show the distinguishing suffix. -/
 def summaryNameWidth : Nat := 56
 
 def displayName (name : String) (width : Nat := summaryNameWidth) : String :=
@@ -32,10 +31,9 @@ structure ProfileEvent where
 
 initialize eventLog : IO.Ref (Array ProfileEvent) ← IO.mkRef #[]
 initialize currentDepth : IO.Ref Nat ← IO.mkRef 0
-/-- When > 0, auto-wrapped defs record timings (started by `runProfiledMain` / `withProfile`). -/
-initialize profilingScopeDepth : IO.Ref Nat ← IO.mkRef 0
 
-def bracketEvent [Monad m] [MonadFinally m]
+/-- Record time for a named region. Use in `do` blocks around code you want timed. -/
+def withProfile [Monad m] [MonadFinally m]
     [MonadLiftT (ST IO.RealWorld) m] [MonadLiftT BaseIO m]
     (name : String) (action : m α) : m α := do
   let start ← IO.monoNanosNow
@@ -47,65 +45,6 @@ def bracketEvent [Monad m] [MonadFinally m]
     currentDepth.set depth
     let stop ← IO.monoNanosNow
     eventLog.modify (·.push { name, startNs := start, endNs := stop, depth })
-
-/-- Manual region: starts the profiling scope and records this label. -/
-def withProfile [Monad m] [MonadFinally m]
-    [MonadLiftT (ST IO.RealWorld) m] [MonadLiftT BaseIO m]
-    (name : String) (action : m α) : m α := do
-  profilingScopeDepth.modify (· + 1)
-  try
-    bracketEvent name action
-  finally
-    profilingScopeDepth.modify (· - 1)
-
-/-- Used by auto-instrumentation: record only while a scope is active (~one ref read otherwise). -/
-def withProfileWhenActive [Monad m] [MonadFinally m]
-    [MonadLiftT (ST IO.RealWorld) m] [MonadLiftT BaseIO m]
-    (name : String) (action : m α) : m α := do
-  if (← profilingScopeDepth.get) == 0 then
-    action
-  else
-    bracketEvent name action
-
-/-- Open the profiling scope once at program entry (`IO UInt32` Lake exes supported). -/
-def profileRun (action : IO α) : IO α :=
-  withProfile "run" action
-
-/-- Named entry scope when you run several commands from one executable. -/
-def profileRunNamed (name : String) (action : IO α) : IO α :=
-  withProfile name action
-
-/-- Alias for older call sites. Prefer `profileRun`. -/
-def runProfiledMain (action : IO α) : IO α :=
-  profileRun action
-
-/-- Pure defs: times body only while profiling scope is active. -/
-unsafe def profilePure [Inhabited α] (name : String) (body : α) : α :=
-  unsafeBaseIO do
-    if (← profilingScopeDepth.get) == 0 then
-      return body
-    profilingScopeDepth.modify (· + 1)
-    try
-      let start ← IO.monoNanosNow
-      let depth ← currentDepth.get
-      currentDepth.set (depth + 1)
-      let r := body
-      currentDepth.set depth
-      let stop ← IO.monoNanosNow
-      eventLog.modify (·.push { name, startNs := start, endNs := stop, depth })
-      return r
-    finally
-      profilingScopeDepth.modify (· - 1)
-
-def exportProfile (path : System.FilePath) : IO Unit := do
-  let events ← eventLog.get
-  let q := "\""
-  let eventStrs := events.map fun e =>
-    let dur := e.endNs - e.startNs
-    s!"\{{q}name{q}:{q}{e.name}{q},{q}cat{q}:{q}lean{q},{q}ph{q}:{q}X{q},{q}ts{q}:{e.startNs},{q}dur{q}:{dur},{q}pid{q}:1,{q}tid{q}:1}"
-  let joined := String.intercalate ",\n  " eventStrs.toList
-  let json := s!"\{{q}displayTimeUnit{q}:{q}ns{q},{q}traceEvents{q}:[\n  {joined}\n]}"
-  IO.FS.writeFile path json
 
 def formatDuration (ns : Nat) : String :=
   if ns < 1000 then s!"{ns} ns"
