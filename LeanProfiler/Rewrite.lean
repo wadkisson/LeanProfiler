@@ -8,12 +8,6 @@ open Lean Elab Command
 
 @[expose] public meta section
 
-/-- When true, `@[profile]` IO `def`s are rewritten to wrap the body in `withProfile`. -/
-register_option profiler.rewrite : Bool := {
-  defValue := false
-  descr := "Rewrite `@[profile]` IO defs to use `withProfile` at elaboration time."
-}
-
 register_label_attr profile
 
 meta initialize autoInstrumentGuard : IO.Ref Bool ← IO.mkRef false
@@ -52,9 +46,6 @@ def isSkippedReturnShape (sig : Syntax) : Bool :=
 def isProfileIODo (modifiers : Syntax) (sig body : Syntax) : Bool :=
   hasProfileAttr modifiers && body.isOfKind ``Parser.Term.do && !isSkippedReturnShape sig
 
-def shouldRewrite (opts : Options) (modifiers : Syntax) : Bool :=
-  hasProfileAttr modifiers && profiler.rewrite.get opts
-
 def elaboratedDeclName (shortName : Name) : CommandElabM Name := do
   let ns ← getCurrNamespace
   pure (ns.append shortName)
@@ -83,9 +74,8 @@ def wrapProfiledDef (nameIdent : Syntax) (declName : Name) (sig : Syntax) (body 
 meta def elabAutoInstrument : CommandElab := fun stx => do
   let guard ← autoInstrumentGuard.get
   if guard then throwUnsupportedSyntax
-  let opts ← getOptions
   let modifiers := stx[0]
-  unless shouldRewrite opts modifiers do
+  unless hasProfileAttr modifiers do
     throwUnsupportedSyntax
   let declBody := stx[1]
   unless declBody.isOfKind ``Lean.Parser.Command.definition do
@@ -105,5 +95,5 @@ meta def elabAutoInstrument : CommandElab := fun stx => do
   if isIOReturnShape sig || isProfileIODo modifiers sig body then
     wrapProfiledDef nameIdent declName sig body
   else
-    logWarning m!"@[profile] on `{declName}`: only IO `def`s are rewritten"
+    logWarning m!"@[profile] on `{declName}`: only IO `def`s are supported"
     throwUnsupportedSyntax

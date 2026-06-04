@@ -1,8 +1,6 @@
 import LeanProfiler
 import test.Gnarly.Core
 
-set_option profiler.rewrite true
-
 @[profile]
 def lexTokens (src : String) : IO (List String) := do
   pulse "compiler.lex" 2
@@ -29,6 +27,7 @@ def codegen (typed : List String) : IO (List String) := do
     out := s!"obj:{t}" :: out
   pure out.reverse
 
+@[profile]
 def compileSource (src : String) : IO (List String) := do
   let toks ← lexTokens src
   let asts ← parseModule toks
@@ -39,8 +38,7 @@ def compileSource (src : String) : IO (List String) := do
 def compileBatch (sources : List String) : IO Nat := do
   let mut count := 0
   for src in sources do
-    let objs ← withProfile s!"compiler.batch.{count}" do
-      compileSource src
+    let objs ← compileSource src
     count := count + objs.length
   pure count
 

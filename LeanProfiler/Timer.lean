@@ -14,7 +14,7 @@ structure ProfileEvent where
 initialize eventLog : IO.Ref (Array ProfileEvent) ← IO.mkRef #[]
 initialize currentDepth : IO.Ref Nat ← IO.mkRef 0
 
-/-- Time a named region. Wrap code manually, or use `set_option profiler.rewrite true` + `@[profile]`. -/
+/-- Used by the `@[profile]` rewriter (not for direct use). -/
 def withProfile [Monad m] [MonadFinally m]
     [MonadLiftT (ST IO.RealWorld) m] [MonadLiftT BaseIO m]
     (name : String) (action : m α) : m α := do
@@ -30,6 +30,3 @@ def withProfile [Monad m] [MonadFinally m]
 
 def getEvents : IO (Array ProfileEvent) :=
   eventLog.get
-
-def clearEvents : IO Unit :=
-  eventLog.set #[]

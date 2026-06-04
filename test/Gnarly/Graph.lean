@@ -1,8 +1,6 @@
 import LeanProfiler
 import test.Gnarly.Core
 
-set_option profiler.rewrite true
-
 structure Node where
   id : Nat
   weight : Nat
@@ -70,3 +68,14 @@ def walkBreadth (start : Nat) (layers : Nat) : IO Nat := do
     total := total + s
     frontier := nxt
   pure total
+
+@[profile]
+def graphWhileJobs (iter : Nat) : IO Nat := do
+  let mut acc := 0
+  let mut i := 0
+  while i < iter do
+    let d ← walkBreadth (i % 9) 3
+    let b ← walkGraph i 3
+    acc := acc + d + b
+    i := i + 1
+  pure acc

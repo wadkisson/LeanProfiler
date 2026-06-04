@@ -1,24 +1,20 @@
 # LeanProfiler
 
-Three modules:
-
-| File | Role |
-|------|------|
-| `LeanProfiler/Timer.lean` | `withProfile` — the timer |
-| `LeanProfiler/Rewrite.lean` | `set_option profiler.rewrite true` + `@[profile]` — rewrite IO defs at elaboration |
-| `LeanProfiler/Summary.lean` | `printSummary`, `exportFlameGraph` — table + Perfetto flame timeline |
+Import the library, mark IO functions with `@[profile]`, call `printSummary` when done.
 
 ```lean
 import LeanProfiler
 
-set_option profiler.rewrite true
-
 @[profile]
-def hot : IO Unit := do ...
+def hotStep : IO Unit := do ...
 
 def main : IO Unit := do
-  withProfile "main" do
-    hot
+  hotStep
   printSummary
-  exportFlameGraph "trace.json"  -- ui.perfetto.dev
 ```
+
+Each profiled file needs `import LeanProfiler` (the rewriter runs per file).
+
+IO `def`s only. Skips `partial` defs and `Except` / `Result` returns automatically.
+
+Optional: `exportFlameGraph "trace.json"` then open at [ui.perfetto.dev](https://ui.perfetto.dev).

@@ -4,8 +4,6 @@ import test.Gnarly.Compiler
 import test.Gnarly.Cache
 import test.Gnarly.Graph
 
-set_option profiler.rewrite true
-
 structure Job where
   id : Nat
   payload : String
@@ -22,11 +20,11 @@ def runJob (j : Job) : IO Nat := do
   let cached ← cacheGetOrCompute j.id
   pure (compiled.length + cached)
 
+@[profile]
 def drainQueue (jobs : List Job) : IO Nat := do
   let mut acc := 0
   for j in jobs do
-    let n ← withProfile s!"worker.run.{j.id}" do
-      runJob j
+    let n ← runJob j
     acc := acc + n
   pure acc
 
@@ -43,8 +41,7 @@ def workerPool (workers : Nat) (jobs : List Job) : IO Nat := do
   let mut total := 0
   for w in List.range chunks.length do
     let chunk := chunks[w]!
-    let n ← withProfile s!"worker.pool.{w}" do
-      drainQueue chunk
+    let n ← drainQueue chunk
     total := total + n
   pure total
 
@@ -53,17 +50,6 @@ def schedulerBurst (rounds : Nat) : IO Nat := do
   let mut grand := 0
   for r in List.range rounds do
     let jobs := makeJobs (3 + r)
-    let n ← withProfile s!"worker.burst.{r}" do
-      workerPool (2 + r % 2) jobs
+    let n ← workerPool (2 + r % 2) jobs
     grand := grand + n
   pure grand
-
-def graphWhileJobs (iter : Nat) : IO Nat := do
-  let mut acc := 0
-  let mut i := 0
-  while i < iter do
-    let d ← walkBreadth (i % 9) 3
-    let b ← walkGraph i 3
-    acc := acc + d + b
-    i := i + 1
-  pure acc

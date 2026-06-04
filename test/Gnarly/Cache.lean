@@ -2,8 +2,6 @@ import LeanProfiler
 import test.Gnarly.Core
 import test.Gnarly.Graph
 
-set_option profiler.rewrite true
-
 @[profile]
 def cacheProbe (key : Nat) : IO Bool := do
   pulse s!"cache.probe.{key % 4}" 1
@@ -14,16 +12,16 @@ def cacheFill (key : Nat) (value : Nat) : IO Unit := do
   pulse s!"cache.fill.{key}" 2
   emit "cache" s!"stored {key}={value}"
 
+@[profile]
 def cacheGetOrCompute (key : Nat) : IO Nat := do
   let hit ← cacheProbe key
   if hit then
     pulse s!"cache.hit.{key}" 1
     pure (key * 7)
   else
-    withProfile s!"cache.miss.{key}" do
-      let v ← walkGraph (key % 9) 2
-      cacheFill key v
-      pure v
+    let v ← walkGraph (key % 9) 2
+    cacheFill key v
+    pure v
 
 @[profile]
 def warmCache (keys : List Nat) : IO Nat := do
@@ -33,11 +31,11 @@ def warmCache (keys : List Nat) : IO Nat := do
     sum := sum + v
   pure sum
 
+@[profile]
 def cacheStress (rounds : Nat) : IO Nat := do
   let mut total := 0
   for r in List.range rounds do
     let keys := (List.range 8).map (fun i => r * 10 + i)
-    let s ← withProfile s!"cache.round.{r}" do
-      warmCache keys
+    let s ← warmCache keys
     total := total + s
   pure total
