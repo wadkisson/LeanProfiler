@@ -1,6 +1,5 @@
 module
 
-public import LeanProfiler.Option
-public import LeanProfiler.Attr
-public import LeanProfiler.Basic
-public import LeanProfiler.Macro
+public import LeanProfiler.Timer
+public import LeanProfiler.Rewrite
+public import LeanProfiler.Summary

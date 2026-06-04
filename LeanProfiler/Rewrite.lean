@@ -1,13 +1,20 @@
 module
 
-public import LeanProfiler.Basic
-public meta import LeanProfiler.Option
-public meta import LeanProfiler.Attr
+public import LeanProfiler.Timer
+public meta import Lean.LabelAttribute
 public meta import Lean.Elab.Command
 
 open Lean Elab Command
 
 @[expose] public meta section
+
+/-- When true, `@[profile]` IO `def`s are rewritten to wrap the body in `withProfile`. -/
+register_option profiler.rewrite : Bool := {
+  defValue := false
+  descr := "Rewrite `@[profile]` IO defs to use `withProfile` at elaboration time."
+}
+
+register_label_attr profile
 
 meta initialize autoInstrumentGuard : IO.Ref Bool ← IO.mkRef false
 
@@ -98,5 +105,5 @@ meta def elabAutoInstrument : CommandElab := fun stx => do
   if isIOReturnShape sig || isProfileIODo modifiers sig body then
     wrapProfiledDef nameIdent declName sig body
   else
-    logWarning m!"@[profile] on `{declName}`: only IO `def`s are rewritten; use `withProfile` manually"
+    logWarning m!"@[profile] on `{declName}`: only IO `def`s are rewritten"
     throwUnsupportedSyntax

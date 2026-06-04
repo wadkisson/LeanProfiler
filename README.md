@@ -1,33 +1,24 @@
 # LeanProfiler
 
-Time regions with `withProfile`, optionally auto-wrap `@[profile]` IO defs, then `printSummary`.
+Three modules:
 
-## Manual profiling
+| File | Role |
+|------|------|
+| `LeanProfiler/Timer.lean` | `withProfile` — the timer |
+| `LeanProfiler/Rewrite.lean` | `set_option profiler.rewrite true` + `@[profile]` — rewrite IO defs at elaboration |
+| `LeanProfiler/Summary.lean` | `printSummary`, `exportFlameGraph` — table + Perfetto flame timeline |
 
 ```lean
 import LeanProfiler
 
-def main : IO Unit := do
-  withProfile "load" do
-    ...
-  withProfile "train" do
-    ...
-  printSummary
-```
-
-## Optional auto-rewrite
-
-```lean
 set_option profiler.rewrite true
 
 @[profile]
-def trainStep : IO Unit := do
-  ...
+def hot : IO Unit := do ...
+
+def main : IO Unit := do
+  withProfile "main" do
+    hot
+  printSummary
+  exportFlameGraph "trace.json"  -- ui.perfetto.dev
 ```
-
-With `profiler.rewrite` on, the macro wraps that def’s body in `withProfile "Full.Name" …`. Without it, `@[profile]` is only a label (no rewrite).
-
-## Limits
-
-- IO `def`s only (`Except` / `Result` / `partial` are skipped).
-- Simple `def := …` shapes only.

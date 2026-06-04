@@ -5,22 +5,6 @@ defaultTargets = ["leanprofiler"]
 [[lean_lib]]
 name = "LeanProfiler"
 
-[[lean_lib]]
-name = "test"
-globs = ["test.+"]
-
 [[lean_exe]]
 name = "leanprofiler"
 root = "Main"
-
-[[lean_exe]]
-name = "testRun"
-root = "test.Run"
-
-[[lean_exe]]
-name = "testExceptSafe"
-root = "test.ExceptSafe"
-
-[[lean_exe]]
-name = "testRunUInt32"
-root = "test.RunUInt32"
