@@ -43,7 +43,8 @@ partial def dfs (g : List Node) (cur : Nat) (budget : Nat) (seen : List Nat) : I
 
 @[profile]
 def walkGraph (start : Nat) (depth : Nat) : IO Nat := do
-  dfs sampleGraph start depth []
+  profile "walkGraph.dfs" do
+    dfs sampleGraph start depth []
 
 def bfsLayer (g : List Node) (frontier : List Nat) : IO (List Nat × Nat) := do
   let mut next : List Nat := []
@@ -61,13 +62,14 @@ def bfsLayer (g : List Node) (frontier : List Nat) : IO (List Nat × Nat) := do
 
 @[profile]
 def walkBreadth (start : Nat) (layers : Nat) : IO Nat := do
-  let mut frontier := [start]
-  let mut total := 0
-  for _ in List.range layers do
-    let (nxt, s) ← bfsLayer sampleGraph frontier
-    total := total + s
-    frontier := nxt
-  pure total
+  profile "walkBreadth.layers" do
+    let mut frontier := [start]
+    let mut total := 0
+    for _ in List.range layers do
+      let (nxt, s) ← bfsLayer sampleGraph frontier
+      total := total + s
+      frontier := nxt
+    pure total
 
 @[profile]
 def graphWhileJobs (iter : Nat) : IO Nat := do

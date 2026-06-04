@@ -65,7 +65,7 @@ def wrapProfiledDef (nameIdent : Syntax) (declName : Name) (sig : Syntax) (body 
   let nameStr ← profileLabel declName
   let bodyTerm : TSyntax `term := ⟨body⟩
   let newCmd ←
-    `(def $nameIdentT:ident $sigT:optDeclSig := withProfile $nameStr $bodyTerm)
+    `(def $nameIdentT:ident $sigT:optDeclSig := profile $nameStr $bodyTerm)
   autoInstrumentGuard.set true
   elabCommand newCmd
   autoInstrumentGuard.set false
