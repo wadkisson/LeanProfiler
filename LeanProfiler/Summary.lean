@@ -97,11 +97,15 @@ def exportFlameGraph (path : System.FilePath) : IO Unit := do
   let json := s!"\{{q}displayTimeUnit{q}:{q}ns{q},{q}traceEvents{q}:[\n  {joined}\n]}"
   IO.FS.writeFile path json
 
-/-- Run `action`, then write a Perfetto trace and print the text summary. -/
-def withSummary (action : IO α) : IO α := do
+/-- Write trace + print summary. Call once when profiling is finished. -/
+def profileEnd : IO Unit := do
+  exportFlameGraph defaultTracePath
+  printSummary
+  IO.println s!"Flame trace: {defaultTracePath} → https://ui.perfetto.dev"
+
+/-- Run `action`, then `profile`. -/
+def profileAfter (action : IO α) : IO α := do
   try
     action
   finally
-    exportFlameGraph defaultTracePath
-    printSummary
-    IO.println s!"Flame trace: {defaultTracePath} → https://ui.perfetto.dev"
+    profileEnd

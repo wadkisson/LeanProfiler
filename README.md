@@ -1,7 +1,5 @@
 # LeanProfiler
 
-Import the library, mark IO functions with `@[profile]`, define `main` as usual.
-
 ```lean
 public import LeanProfiler
 
@@ -16,33 +14,43 @@ def train : IO Unit := do
 
 def main : IO Unit := do
   train
+  profile
 ```
 
 - **`@[profile]`** — whole function is one span.
 - **`profile "name" do ...`** — manual sub-span inside a `do` block.
-- **`def main`** — auto-wrapped on exit: Perfetto trace (`build/leanprofiler-trace.json`) + text summary. Works for `IO Unit`, `IO UInt32`, etc.
+- **`profile`** (no args) — trace file + text summary + Perfetto link (call once when finished).
 
-Use **`public import LeanProfiler`** in modules that use `@[profile]` (attributes expand at elaboration time).
+Use **`public import LeanProfiler`** in modules that use `@[profile]`.
 
 ## CLI / exit-code mains (TorchLean-style)
 
-Import LeanProfiler in the executable module; `main` is wrapped automatically — no trailing `printSummary`:
+Put `profile` where the command actually finishes:
 
 ```lean
-public import LeanProfiler
-
-def main (args : List String) : IO UInt32 := do
-  Common.runAnyOrFloat exeName args
-    (preferFloat := ...)
-    (banner := ...)
-    (anyK := fun ... => ...)
-    (floatK := fun opts rest => do
-      let _ ← unitTrainStepsFloat opts input train)
+(floatK := fun opts rest => do
+  let _ ← unitTrainStepsFloat opts input train
+  profile)
 ```
 
-Optional: `exportFlameGraph "custom.json"` inside `main` for a different path (runs before the auto-export).
+Or keep an exit code:
 
-If you bind a value after setup + side effects, use `profileLet` instead of ending a block with `pure x`:
+```lean
+def main (args : List String) : IO UInt32 := do
+  let code ← Common.runAnyOrFloat exeName args ...
+  profile
+  pure code
+```
+
+Wrap a whole block with **`profileAfter`** if that reads cleaner:
+
+```lean
+def main (args : List String) : IO UInt32 :=
+  profileAfter do
+    Common.runAnyOrFloat exeName args ...
+```
+
+If you bind a value after setup + side effects, use `profileLet`:
 
 ```lean
 let sess ← profileLet "openSession" (EagerSession.new opts) fun sess =>

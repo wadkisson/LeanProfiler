@@ -48,3 +48,4 @@ def main : IO Unit := do
   IO.println "╚══════════════════════════════════════════╝"
   IO.println ""
   runGnarly
+  profile
