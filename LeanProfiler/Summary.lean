@@ -103,6 +103,11 @@ def profileEnd : IO Unit := do
   printSummary
   IO.println s!"Flame trace: {defaultTracePath} → https://ui.perfetto.dev"
 
+/-- Print summary, then return `x` (for `main : IO UInt32` and similar). -/
+def profileReturn (x : α) : IO α := do
+  profileEnd
+  pure x
+
 /-- Run `action`, then `profile`. -/
 def profileAfter (action : IO α) : IO α := do
   try

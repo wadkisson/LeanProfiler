@@ -19,35 +19,33 @@ def main : IO Unit := do
 
 - **`@[profile]`** — whole function is one span.
 - **`profile "name" do ...`** — manual sub-span inside a `do` block.
-- **`profile`** (no args) — trace file + text summary + Perfetto link (call once when finished).
+- **`profile`** — print summary + trace (`IO Unit` mains).
+- **`profile code`** — same, then return `code` (`IO UInt32` mains — no separate `pure`).
 
 Use **`public import LeanProfiler`** in modules that use `@[profile]`.
 
 ## CLI / exit-code mains (TorchLean-style)
 
-Put `profile` where the command actually finishes:
-
-```lean
-(floatK := fun opts rest => do
-  let _ ← unitTrainStepsFloat opts input train
-  profile)
-```
-
-Or keep an exit code:
-
 ```lean
 def main (args : List String) : IO UInt32 := do
   let code ← Common.runAnyOrFloat exeName args ...
-  profile
-  pure code
+  profile code
 ```
 
-Wrap a whole block with **`profileAfter`** if that reads cleaner:
+Or wrap the whole CLI call:
 
 ```lean
 def main (args : List String) : IO UInt32 :=
   profileAfter do
     Common.runAnyOrFloat exeName args ...
+```
+
+Inside a callback (`IO Unit`):
+
+```lean
+(floatK := fun opts rest => do
+  let _ ← unitTrainStepsFloat opts input train
+  profile)
 ```
 
 If you bind a value after setup + side effects, use `profileLet`:
