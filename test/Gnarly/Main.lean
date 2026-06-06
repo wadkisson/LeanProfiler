@@ -48,7 +48,3 @@ def main : IO Unit := do
   IO.println "╚══════════════════════════════════════════╝"
   IO.println ""
   runGnarly
-  IO.println ""
-  IO.println "── summary ──"
-  printSummary
-  exportFlameGraph "build/gnarly-trace.json"

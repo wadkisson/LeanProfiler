@@ -70,6 +70,8 @@ def buildSummaryRows (events : Array ProfileEvent) : Array SummaryRow := Id.run 
     let pct := if totalSelf == 0 then 0 else (self * 1000) / totalSelf
     { name, totalNs := total, selfNs := self, calls, pct, bar := flameBar self totalSelf }
 
+def defaultTracePath : System.FilePath := "build/leanprofiler-trace.json"
+
 def printSummary : IO Unit := do
   let events ← getEvents
   let rows := buildSummaryRows events
@@ -84,6 +86,8 @@ def printSummary : IO Unit := do
 
 /-- Perfetto / Chrome trace JSON — open at https://ui.perfetto.dev for a flame timeline. -/
 def exportFlameGraph (path : System.FilePath) : IO Unit := do
+  if let some dir := path.parent then
+    IO.FS.createDirAll dir
   let events ← getEvents
   let q := "\""
   let eventStrs := events.map fun e =>
@@ -92,3 +96,12 @@ def exportFlameGraph (path : System.FilePath) : IO Unit := do
   let joined := String.intercalate ",\n  " eventStrs.toList
   let json := s!"\{{q}displayTimeUnit{q}:{q}ns{q},{q}traceEvents{q}:[\n  {joined}\n]}"
   IO.FS.writeFile path json
+
+/-- Run `action`, then write a Perfetto trace and print the text summary. -/
+def withSummary (action : IO α) : IO α := do
+  try
+    action
+  finally
+    exportFlameGraph defaultTracePath
+    printSummary
+    IO.println s!"Flame trace: {defaultTracePath} → https://ui.perfetto.dev"
