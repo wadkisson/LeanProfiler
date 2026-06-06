@@ -14,41 +14,26 @@ def train : IO Unit := do
 
 def main : IO Unit := do
   train
-  profile
 ```
 
 - **`@[profile]`** — whole function is one span.
 - **`profile "name" do ...`** — manual sub-span inside a `do` block.
-- **`profile`** — print summary + trace (`IO Unit` mains).
-- **`profile code`** — same, then return `code` (`IO UInt32` mains — no separate `pure`).
+- **`main`** — auto-wrapped: summary + trace run when the program exits (any `IO` return type).
 
 Use **`public import LeanProfiler`** in modules that use `@[profile]`.
 
-## CLI / exit-code mains (TorchLean-style)
+No manual close step on `main`. TorchLean-style CLIs stay as-is:
 
 ```lean
 def main (args : List String) : IO UInt32 := do
-  let code ← Common.runAnyOrFloat exeName args ...
-  profile code
+  Common.runAnyOrFloat exeName args ...
 ```
 
-Or wrap the whole CLI call:
+If `main` is not your entry point (e.g. training runs inside a callback only), call **`profile`** once at the end of that `IO Unit` path.
 
-```lean
-def main (args : List String) : IO UInt32 :=
-  profileAfter do
-    Common.runAnyOrFloat exeName args ...
-```
+Optional: **`profileAfter do ...`** if you need an explicit wrapper instead of relying on auto-`main`.
 
-Inside a callback (`IO Unit`):
-
-```lean
-(floatK := fun opts rest => do
-  let _ ← unitTrainStepsFloat opts input train
-  profile)
-```
-
-If you bind a value after setup + side effects, use `profileLet`:
+If you bind a value after setup + side effects, use **`profileLet`**:
 
 ```lean
 let sess ← profileLet "openSession" (EagerSession.new opts) fun sess =>

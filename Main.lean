@@ -8,4 +8,3 @@ def work : IO Nat := do
 def main : IO Unit := do
   let n ← work
   IO.println s!"result={n}"
-  profile
