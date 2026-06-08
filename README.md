@@ -18,7 +18,7 @@ def main : IO Unit := do
 
 - **`@[profile]`** — whole function is one span.
 - **`profile "name" do ...`** — manual sub-span inside a `do` block.
-- **`main`** — auto-wrapped: summary + trace run when the program exits (any `IO` return type).
+- **`main`** — auto-wrapped: summary + trace run when the program exits (any `IO` return type). Nested `main`s (e.g. TorchLean `Runner.main` → `Gpt2.main`) still print **once** — only the outermost wrapper closes profiling.
 
 Use **`public import LeanProfiler`** in modules that use `@[profile]`.
 

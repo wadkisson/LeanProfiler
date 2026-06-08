@@ -72,6 +72,9 @@ def buildSummaryRows (events : Array ProfileEvent) : Array SummaryRow := Id.run 
 
 def defaultTracePath : System.FilePath := "build/leanprofiler-trace.json"
 
+initialize profileAfterDepth : IO.Ref Nat ← IO.mkRef 0
+initialize profileEnded : IO.Ref Bool ← IO.mkRef false
+
 def printSummary : IO Unit := do
   let events ← getEvents
   let rows := buildSummaryRows events
@@ -97,20 +100,30 @@ def exportFlameGraph (path : System.FilePath) : IO Unit := do
   let json := s!"\{{q}displayTimeUnit{q}:{q}ns{q},{q}traceEvents{q}:[\n  {joined}\n]}"
   IO.FS.writeFile path json
 
-/-- Write trace + print summary. Call once when profiling is finished. -/
+/-- Write trace + print summary. Runs at most once per process. -/
 def profileEnd : IO Unit := do
-  exportFlameGraph defaultTracePath
-  printSummary
-  IO.println s!"Flame trace: {defaultTracePath} → https://ui.perfetto.dev"
+  unless (← profileEnded.get) do
+    profileEnded.set true
+    exportFlameGraph defaultTracePath
+    printSummary
+    IO.println s!"Flame trace: {defaultTracePath} → https://ui.perfetto.dev"
 
 /-- Print summary, then return `x` (for `main : IO UInt32` and similar). -/
 def profileReturn (x : α) : IO α := do
   profileEnd
   pure x
 
-/-- Run `action`, then `profile`. -/
+/-- Run `action`; only the outermost nested call prints the summary (TorchLean root + subcommand `main`). -/
 def profileAfter (action : IO α) : IO α := do
+  let depth ← profileAfterDepth.get
+  profileAfterDepth.set (depth + 1)
   try
-    action
+    if depth == 0 then
+      try
+        action
+      finally
+        profileEnd
+    else
+      action
   finally
-    profileEnd
+    profileAfterDepth.set depth
