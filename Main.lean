@@ -1,8 +1,7 @@
 import LeanProfiler
 
-@[profile]
 def work : IO Nat := do
-  IO.sleep 5
+  IO.sleep 1
   pure 42
 
 def main : IO Unit := do
