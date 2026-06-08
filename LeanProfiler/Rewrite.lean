@@ -87,7 +87,7 @@ partial def callHeadName? (stx : Syntax) : Option Name :=
   else if stx.isOfKind ``Parser.Term.paren then
     if stx.getNumArgs ≥ 2 then callHeadName? stx[1] else none
   else if stx.isOfKind ``Parser.Term.dotIdent then
-    some stx[0].getId
+    some stx.getId
   else
     none
 
@@ -108,12 +108,31 @@ def spanLabelForCall (head : Name) : CommandElabM (TSyntax `term) := do
   else
     pure ⟨Syntax.mkStrLit n.toString⟩
 
-def instrumentCallTerm (stx : TSyntax `term) : CommandElabM (TSyntax `term) := do
+/-- `fun _ => do` trailing args: instrument inside, don't wrap the shell (e.g. `withModel`). -/
+def hasCallbackArg (stx : Syntax) : Bool :=
+  stx.isOfKind ``Parser.Term.app && stx.getNumArgs ≥ 2 &&
+    (let last := stx[stx.getNumArgs - 1]
+     last.isOfKind ``Parser.Term.fun && last[last.getNumArgs - 1].isOfKind ``Parser.Term.do)
+
+def isBracketingCall (head : Name) : Bool :=
+  let s := head.eraseMacroScopes.toString
+  s.endsWith "withModel" || s.endsWith "runAnyOrFloat" || s.endsWith "withScope" ||
+    (s.startsWith "with" && !s.startsWith "within")
+
+def shouldNotWrapCall (head : Name) (stx : Syntax) : Bool :=
+  isSkippedCallHead head || hasCallbackArg stx || isBracketingCall head
+
+mutual
+
+/-- Instrument IO calls inside `stx`, then wrap leaf calls (not callback shells). -/
+partial def instrumentCallTerm (stx : TSyntax `term) : CommandElabM (TSyntax `term) := do
+  let recursed ← instrumentProfileTerm stx.raw
+  let stx := ⟨recursed⟩
   if isAlreadyProfiled stx.raw then
     return stx
   match callHeadName? stx.raw with
   | some head =>
-    if isSkippedCallHead head then
+    if shouldNotWrapCall head stx.raw then
       return stx
     else
       let label ← spanLabelForCall head
@@ -121,21 +140,40 @@ def instrumentCallTerm (stx : TSyntax `term) : CommandElabM (TSyntax `term) := d
   | none =>
     return stx
 
-mutual
+partial def instrumentNestedDoExprs (stx : Syntax) : CommandElabM Syntax := do
+  if stx.getKind == ``Parser.Term.doExpr then
+    let newTerm ← instrumentCallTerm ⟨stx[0]⟩
+    return stx.setArg 0 newTerm.raw
+  else
+    let mut e := stx
+    for i in [0:stx.getNumArgs] do
+      let newChild ← instrumentNestedDoExprs stx[i]
+      e := e.setArg i newChild
+    return e
+
+partial def instrumentDoIdDeclAction (decl : Syntax) : CommandElabM Syntax := do
+  if decl.getKind == ``Parser.Term.doIdDecl || decl.getKind == ``Parser.Term.doPatDecl then
+    if decl.getNumArgs > 3 then
+      let action := decl[3]
+      if action.getKind == ``Parser.Term.doExpr then
+        let newTerm ← instrumentCallTerm ⟨action[0]⟩
+        return decl.setArg 3 (action.setArg 0 newTerm.raw)
+  pure decl
 
 partial def instrumentDoElem (elem : Syntax) : CommandElabM Syntax := do
   let kind := elem.getKind
   if kind == ``Parser.Term.doExpr then
     let newTerm ← instrumentCallTerm ⟨elem[0]⟩
     return elem.setArg 0 newTerm.raw
-  else if kind == ``Parser.Term.doLetArrow || kind == ``Parser.Term.doReassignArrow then
-    let bind := elem[elem.getNumArgs - 1]
-    if bind.getKind == ``Parser.Term.doIdDecl || bind.getKind == ``Parser.Term.doPatDecl then
-      let subIdx := bind.getNumArgs - 1
-      let newSub ← instrumentDoElem bind[subIdx]
-      return elem.setArg (elem.getNumArgs - 1) (bind.setArg subIdx newSub)
-    else
-      return elem
+  else if kind == ``Parser.Term.doIdDecl || kind == ``Parser.Term.doPatDecl then
+    instrumentDoIdDeclAction elem
+  else if kind == ``Parser.Term.doLetArrow then
+    let mut e := elem
+    for i in [0:elem.getNumArgs] do
+      if elem[i].getKind == ``Parser.Term.doIdDecl || elem[i].getKind == ``Parser.Term.doPatDecl then
+        let newDecl ← instrumentDoIdDeclAction elem[i]
+        e := e.setArg i newDecl
+    return e
   else if kind == ``Parser.Term.doLet then
     let decl := elem[elem.getNumArgs - 1]
     if decl.isOfKind ``Parser.Term.letIdDecl || decl.isOfKind ``Parser.Term.letPatDecl then
@@ -160,35 +198,40 @@ partial def instrumentDoElem (elem : Syntax) : CommandElabM Syntax := do
     let newBody ← instrumentDoSeqRaw elem[bodyIdx]
     return elem.setArg bodyIdx newBody
   else
-    return elem
+    instrumentNestedDoExprs elem
 
 partial def instrumentDoSeqRaw (doSeq : Syntax) : CommandElabM Syntax := do
   let elems := getDoElems ⟨doSeq⟩
   let newElems ← elems.mapM fun elem => do
     let newRaw ← instrumentDoElem elem.raw
     pure (⟨newRaw⟩ : TSyntax `doElem)
-  let info := doSeq.getHeadInfo
-  pure (Syntax.node1 info ``Parser.Term.doSeq (Syntax.node info `null (Array.map (·.raw) newElems)))
+  let newDo ← `(do $[$newElems:doElem]*)
+  pure newDo.raw[1]
 
-end
-
-def instrumentMainBody (body : Syntax) : CommandElabM (TSyntax `term) := do
-  match body with
-  | `(do $doSeq:doSeq) =>
-    let elems := getDoElems doSeq
+partial def instrumentMainBody (body : Syntax) : CommandElabM (TSyntax `term) := do
+  if body.isOfKind ``Parser.Term.do then
+    let doSeq := body[1]
+    let elems := getDoElems ⟨doSeq⟩
     let newElems ← elems.mapM fun elem => do
       let newRaw ← instrumentDoElem elem.raw
       pure (⟨newRaw⟩ : TSyntax `doElem)
-    `(do $[$newElems:doElem]*)
-  | _ =>
+    let newDo ← `(do $[$newElems:doElem]*)
+    pure ⟨body.setArg 1 newDo.raw[1]⟩
+  else
     instrumentCallTerm ⟨body⟩
 
-/-- Like `instrumentMainBody`, but also walks `fun _ => do` bodies (e.g. `withModel` callbacks). -/
+/-- Walk `fun _ => do` bodies (e.g. `withModel` callbacks) and nested `do`/`for`. -/
 partial def instrumentProfileTerm (stx : Syntax) : CommandElabM Syntax := do
   if stx.isOfKind ``Parser.Term.do then
     let newTerm ← instrumentMainBody stx
     pure newTerm.raw
   else if stx.isOfKind ``Parser.Term.fun then
+    let mut e := stx
+    for i in [1:stx.getNumArgs] do
+      let newChild ← instrumentProfileTerm stx[i]
+      e := e.setArg i newChild
+    pure e
+  else if stx.isOfKind ``Parser.Term.basicFun then
     let bodyIdx := stx.getNumArgs - 1
     let newBody ← instrumentProfileTerm stx[bodyIdx]
     pure (stx.setArg bodyIdx newBody)
@@ -201,8 +244,16 @@ partial def instrumentProfileTerm (stx : Syntax) : CommandElabM Syntax := do
   else if stx.isOfKind ``Parser.Term.paren && stx.getNumArgs ≥ 2 then
     let newInner ← instrumentProfileTerm stx[1]
     pure (stx.setArg 1 newInner)
+  else if stx.getKind == `null then
+    let mut e := stx
+    for i in [0:stx.getNumArgs] do
+      let newChild ← instrumentProfileTerm stx[i]
+      e := e.setArg i newChild
+    pure e
   else
     pure stx
+
+end
 
 def instrumentProfileBody (body : Syntax) : CommandElabM (TSyntax `term) := do
   let newRaw ← instrumentProfileTerm body

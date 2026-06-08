@@ -23,7 +23,7 @@ def main (args : List String) : IO UInt32 := do
 | **`@[profile]`** | One attribute on the big function | Whole-function span **plus** auto-spans for IO calls inside (including `withModel` callbacks and `for` loops) |
 | **`profile "name" do`** | Wrap a section manually | Named sub-span when you want finer control |
 
-**TorchLean GPT2:** put `@[profile]` on `unitTrainStepsFloat` — that's it. You'll see `meanLossOnSamples`, `generateSampled`, `nn.eval1`, `optH.step`, etc. with call counts. Add `profile "train" do` only when you want a custom label.
+**TorchLean GPT2:** put `@[profile]` on `unitTrainStepsFloat` — that's it. You'll see `meanLossOnSamples`, `generateSampled`, `nn.eval1`, `optH.step`, etc. with call counts. Callback shells like `nn.withModel` and `runAnyOrFloat` are skipped automatically so time shows up in the real work. Add `profile "train" do` only when you want a custom label.
 
 **Simple programs:** `main` auto-profiles top-level calls (e.g. `train`) when `profile_main` is on (default).
 
