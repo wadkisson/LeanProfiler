@@ -17,6 +17,11 @@ public register_option profile_main : Bool := {
   descr := "auto-profile top-level calls in `main` and print summary + trace on exit"
 }
 
+public register_option profile_all : Bool := {
+  defValue := false
+  descr := "auto-apply @[profile] to every IO def in this file (set at top of file)"
+}
+
 meta initialize autoInstrumentGuard : IO.Ref Bool ← IO.mkRef false
 
 def monadicTypeNames : List Name := [`IO, `EIO, `BaseIO]
@@ -298,9 +303,8 @@ def wrapProfileMainWithAttr (nameIdent : Syntax) (declName : Name) (sig : Syntax
   elabCommand newCmd
   autoInstrumentGuard.set false
 
-def tryWrapProfile (modifiers : Syntax) (declBody : Syntax) : CommandElabM Bool := do
-  unless hasProfileAttr modifiers do
-    return false
+def tryWrapIODef (modifiers : Syntax) (declBody : Syntax) (fromProfileAll : Bool) :
+    CommandElabM Bool := do
   unless declBody.isOfKind ``Lean.Parser.Command.definition do
     return false
   if modifiersContain modifiers ``Lean.Parser.Command.partial then
@@ -316,13 +320,26 @@ def tryWrapProfile (modifiers : Syntax) (declBody : Syntax) : CommandElabM Bool 
   if (`LeanProfiler).isPrefixOf declName then
     return false
   unless isIOReturnShape sig || isProfileIODo modifiers sig body do
-    logWarning m!"@[profile] on `{declName}`: only IO `def`s are supported"
+    if !fromProfileAll then
+      logWarning m!"@[profile] on `{declName}`: only IO `def`s are supported"
     return false
   if declName == `main then
     wrapProfileMainWithAttr nameIdent declName sig body
   else
     wrapProfiledDef nameIdent declName sig body
   return true
+
+def tryWrapProfile (modifiers : Syntax) (declBody : Syntax) : CommandElabM Bool := do
+  unless hasProfileAttr modifiers do
+    return false
+  tryWrapIODef modifiers declBody false
+
+def tryWrapProfileAll (modifiers : Syntax) (declBody : Syntax) : CommandElabM Bool := do
+  unless profile_all.get (← getOptions) do
+    return false
+  if hasProfileAttr modifiers then
+    return false
+  tryWrapIODef modifiers declBody true
 
 def tryWrapMain (modifiers : Syntax) (declBody : Syntax) : CommandElabM Bool := do
   if hasProfileAttr modifiers then
@@ -355,6 +372,8 @@ meta def elabAutoInstrument : CommandElab := fun stx => do
   let modifiers := stx[0]
   let declBody := stx[1]
   if (← tryWrapProfile modifiers declBody) then
+    return
+  if (← tryWrapProfileAll modifiers declBody) then
     return
   if (← tryWrapMain modifiers declBody) then
     return

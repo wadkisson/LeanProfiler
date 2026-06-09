@@ -35,6 +35,19 @@ def main : IO Unit := do
 
 Disable auto-`main` with `set_option profile_main false`.
 
+**Profile every function in a file:** set once at the top (per-file scope):
+
+```lean
+public import LeanProfiler
+set_option profile_all true
+
+def setup : IO Unit := do ...
+def train : IO Unit := do ...
+def report : IO Unit := do ...
+```
+
+Same rules as `@[profile]` — IO `def`s only; `main` gets teardown plus a span. Explicit `@[profile]` still wins.
+
 ## Other helpers
 
 - **`profileLet`** — span around setup + side effects: `let x ← profileLet "open" (setup) fun x => ...`
