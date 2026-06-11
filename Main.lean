@@ -1,24 +1,37 @@
 import LeanProfiler
 
-def helper : IO Nat := do
-  IO.sleep 50
-  pure 42
+open LeanProfiler
 
-def other : IO Nat := do
-  IO.sleep 30
-  pure 7
+def busy (n : Nat) : IO Nat := do
+  let mut acc := 0
+  for i in [0:n] do
+    acc := acc + i
+  pure acc
 
-/-- Mimics `nn.withModel … fun _ => do` without pulling in TorchLean. -/
-def withModelSim (k : Nat → IO Nat) : IO Nat :=
-  k 0
-
-@[profile]
-def trainSim : IO Nat := do
-  withModelSim fun _ => do
-    let a ← helper
-    let b ← other
-    pure (a + b)
+def runDemo : IO Unit := do
+  clear
+  withStep 0 do
+    let _ ← recordSpanWith "load.batch"
+      { phase := some "input", backend := some "lean", device := some "cpu" } do
+        busy 25_000
+    withModule "demo.mlp" do
+      let _ ← recordSpanWith "linear"
+        { phase := some "forward",
+          backend := some "lean",
+          dtype := some "float64",
+          device := some "cpu",
+          inputShapes := #["[32,128]", "[128,64]"],
+          outputShape := some "[32,64]" } do
+          busy 50_000
+      let _ ← recordSpanWith "relu"
+        { phase := some "forward",
+          backend := some "lean",
+          dtype := some "float64",
+          device := some "cpu",
+          inputShapes := #["[32,64]"],
+          outputShape := some "[32,64]" } do
+          busy 15_000
+  finish .all "build/leanprofiler-trace.json"
 
 def main : IO Unit := do
-  let n ← trainSim
-  IO.println s!"result={n}"
+  runDemo

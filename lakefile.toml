@@ -14,5 +14,9 @@ name = "leanprofiler"
 root = "Main"
 
 [[lean_exe]]
-name = "gnarly"
-root = "test.Gnarly.Main"
+name = "structured"
+root = "test.Structured.Main"
+
+[[lean_exe]]
+name = "runtime-checks"
+root = "test.RuntimeChecks.Main"
