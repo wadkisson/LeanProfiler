@@ -1,12 +1,85 @@
 # LeanProfiler
 
-LeanProfiler is a small runtime profiler for executable Lean programs.
+LeanProfiler is a small runtime profiler for executable Lean programs. It records host-side spans
+with structured metadata, then emits a terminal summary, a Chrome/Perfetto trace, and a
+self-contained HTML report.
 
-The branch now keeps one profiler path only: `LeanProfiler.Runtime`. The intended use is explicit
-instrumentation at the boundary you care about: an `IO` block, a model step, an operator dispatch,
-or a downstream runtime adapter.
+There are two ways to use it:
 
-## Basic Use
+- **Simple interface** (`LeanProfiler.Sugar`): mark functions with `profiled`, mark your entry
+  point with `profiled_main`, and toggle everything at runtime with the `LEAN_PROFILE` environment
+  variable. When profiling is off, instrumented calls degrade to a single boolean check.
+- **Explicit interface** (`LeanProfiler.Runtime`): call `recordSpanWith`, `withStep`, `withModule`,
+  hooks, and `finish` directly. Use this when you want structured metadata, precise span boundaries,
+  or a downstream runtime adapter.
+
+Both share the same core: `clear` at the start, spans in the middle, `finish` at the end.
+
+## Install
+
+Add LeanProfiler to your project's `lakefile.toml`:
+
+```toml
+[[require]]
+name = "LeanProfiler"
+git = "https://github.com/wadkisson/LeanProfiler"
+rev = "main"
+```
+
+Or depend on a local checkout:
+
+```toml
+[[require]]
+name = "LeanProfiler"
+path = "../LeanProfiler"
+```
+
+Then run `lake update`. Your project must use the same Lean toolchain as LeanProfiler
+(`leanprover/lean4:v4.30.0`, see `lean-toolchain`).
+
+```lean
+import LeanProfiler
+open LeanProfiler
+```
+
+## Simple Interface
+
+Mark the functions you care about with `profiled` and your entry point with `profiled_main`. The
+span name is taken automatically from the declaration name.
+
+```lean
+import LeanProfiler
+
+profiled def loadBatch (n : Nat) : IO (Array Nat) := do
+  pure (Array.range n)
+
+profiled def train : IO Unit := do
+  let _ ← loadBatch 1024
+  pure ()
+
+profiled_main def main : IO Unit := do
+  train
+```
+
+Toggle profiling at runtime — no code changes:
+
+```bash
+LEAN_PROFILE=1 lake exe myapp    # records, then writes summary + trace + HTML at exit
+lake exe myapp                   # profiling off: instrumented calls are ~no-ops
+```
+
+- `LEAN_PROFILE` — unset, `""`, `"0"`, or `"false"` means off; anything else means on.
+- `LEAN_PROFILE_OUT` — trace output path (default `build/leanprofiler-trace.json`). The HTML report
+  is written to that path followed by `.html`.
+
+`profiled_main` calls `clear` on entry and `finish .all` on exit (even if the body throws). Under
+the hood, `profiled def f ... := body` expands to `recordSpanGated "f" body`, and
+`recordSpanGated` / `withProfiledMain` are also usable directly if you prefer functions over macros.
+
+## Explicit Interface
+
+For full control, instrument the boundaries you care about directly: an `IO` block, a model step, an
+operator dispatch, or a downstream runtime adapter.
 
 ```lean
 import LeanProfiler
@@ -21,6 +94,9 @@ def main : IO Unit := do
       pure ()
   finish .all "build/leanprofiler-trace.json"
 ```
+
+`recordSpan "name" do ...` is the no-metadata form; `recordSpanWith "name" metadata do ...` attaches
+structured metadata. Both run the action, time it, record a span, and return the action's result.
 
 `finish .all ...` prints a terminal summary and writes:
 
