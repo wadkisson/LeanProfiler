@@ -15,6 +15,9 @@ There are two ways to use it:
 
 Both share the same core: `clear` at the start, spans in the middle, `finish` at the end.
 
+Want to see it on a real model? [`Example/`](Example/README.md) profiles a small transformer forward
+pass and uses the report to find (and fix) a bottleneck that is *not* where you would expect.
+
 ## Install
 
 Add LeanProfiler to your project's `lakefile.toml`:
@@ -270,13 +273,16 @@ lake build LeanProfiler
 lake exe leanprofiler
 lake exe structured
 lake exe runtime-checks
+LEAN_PROFILE=1 lake exe transformer-demo slow    # the Example/ case study, baseline
+LEAN_PROFILE=1 lake exe transformer-demo fast     # the Example/ case study, optimized
 ```
 
 `leanprofiler` runs a tiny CPU demo. `structured` emits fake model-style events with shape and
 device metadata. `runtime-checks` verifies the summary self-time calculation, hook metadata,
 context restoration after a failed span, concurrent event appends, independent per-thread nesting,
 explicit cross-task parent links, and that pure work is attributed to its own span (the `spanPure` /
-`timePure` forcing guarantee).
+`timePure` forcing guarantee). `transformer-demo` is the [`Example/`](Example/README.md) transformer
+case study — see its README for the before/after profile.
 
 ## What This Is Not
 
