@@ -44,17 +44,17 @@ open LeanProfiler
 
 ## Simple Interface
 
-The entire user-facing surface is four names:
+Two profiling modes plus one on-switch:
 
 | Name | Use |
 |------|-----|
-| `profiled_main def main := ...` | entry point: `clear` on entry, `finish .all` on exit |
-| `profiled def f := ...` | record a span named after the function |
-| `span "name" do ...` | record a span with a runtime-chosen name (loops, per layer) |
-| `spanWith "name" meta do ...` | same, with structured metadata (shapes, phase, memory) |
+| `profiled def f := ...` | automatic: profile a whole function (span named after it) |
+| `span "name" do ...` | manual: profile a block — dynamic name, optional `metadata` |
+| `profiled_main def main := ...` | on-switch: `clear` on entry, `finish .all` on exit |
 
 One rule to remember: **wrap `main` in `profiled_main`, mark work with `profiled` / `span`, run with
-`LEAN_PROFILE=1`.** The span name for `profiled` is taken from the declaration name.
+`LEAN_PROFILE=1`.** The span name for `profiled` is taken from the declaration name; pass metadata to
+a manual span with `span "name" (metadata := { ... }) do ...`.
 
 ```lean
 import LeanProfiler
@@ -87,13 +87,13 @@ the dispatch loop:
 def forward (layers : Array Layer) (x : Tensor) : IO Tensor := do
   let mut h := x
   for layer in layers do
-    h ← spanWith layer.name { phase := some "forward" } do layer.run h
+    h ← span layer.name (metadata := { phase := some "forward" }) do layer.run h
   return h
 ```
 
-`span` / `spanWith` are gated on `LEAN_PROFILE` exactly like `profiled`, so leaving them in production
-code costs a single boolean check when profiling is off. They only emit output when the entry point
-is wrapped in `profiled_main` (which owns `clear` / `finish`).
+`span` is gated on `LEAN_PROFILE` exactly like `profiled`, so leaving it in production code costs a
+single boolean check when profiling is off. It only emits output when the entry point is wrapped in
+`profiled_main` (which owns `clear` / `finish`).
 
 ## Explicit Interface
 

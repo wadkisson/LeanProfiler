@@ -11,12 +11,12 @@ public import Lean
 /-!
 # LeanProfiler Sugar
 
-The minimal, near-zero-overhead ergonomic layer over `LeanProfiler.Runtime`. The entire
-user-facing surface is three names:
+The minimal, near-zero-overhead ergonomic layer over `LeanProfiler.Runtime`. Two profiling modes
+plus one on-switch:
 
-* `profiled_main def main := ...` — set up + tear down the profiler around your entry point.
-* `profiled def f := ...`        — record a span named after the function.
-* `span "name" do ...`           — record a span with a runtime-chosen name (loops, per-layer).
+* `profiled def f := ...`  — automatic: profile a whole function (span named after it).
+* `span "name" do ...`     — manual: profile a block (dynamic name; optional metadata).
+* `profiled_main def main := ...` — the on-switch: `clear` on entry, `finish .all` on exit.
 
 Everything is gated on the `LEAN_PROFILE` environment variable, read once at startup:
 
@@ -44,16 +44,19 @@ report is written to this path followed by `.html`. -/
 initialize profileOutputPath : String ← do
   pure ((← IO.getEnv "LEAN_PROFILE_OUT").getD "build/leanprofiler-trace.json")
 
-/-- Record a span with a runtime-chosen `name` and metadata, but only when profiling is enabled;
-otherwise run `action` directly with no overhead. -/
-@[inline] def spanWith {α : Type} (name : String) (metadata : Metadata := {}) (action : IO α) : IO α :=
-  if profilingEnabled then recordSpanWith name metadata action else action
+/-- Record a span for `action` under a runtime-chosen `name`, only when profiling is enabled;
+otherwise run `action` directly with no overhead. This is the one manual combinator: use it for a
+per-iteration/per-layer breakdown (`span layer.name do ...` in a loop) or around any block. Pass
+optional `metadata` for shapes/phase/memory that enrich the report. It is also what `profiled`
+expands into.
 
-/-- Record a span with a runtime-chosen `name`, only when profiling is enabled; otherwise run
-`action` directly with no overhead. This is the one manual combinator you need for a per-iteration or
-per-layer breakdown (`span layer.name do ...` in a loop). It is also what `profiled` expands into. -/
-@[inline] def span {α : Type} (name : String) (action : IO α) : IO α :=
-  spanWith name {} action
+```lean
+span "matmul" do runMatmul
+span "matmul" (metadata := { phase := some "forward" }) do runMatmul
+```
+-/
+@[inline] def span {α : Type} (name : String) (action : IO α) (metadata : Metadata := {}) : IO α :=
+  if profilingEnabled then recordSpanWith name metadata action else action
 
 /-- Wrap a program entry point: `clear` on entry and `finish .all` on exit (even if the body
 throws), but only when profiling is enabled. When disabled this is just `action`. -/
