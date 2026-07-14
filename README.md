@@ -297,3 +297,7 @@ The runtime state is synchronized so concurrent writes do not corrupt the event 
 are tracked per runtime thread, and cross-task parentage can be passed explicitly. That still does
 not make LeanProfiler a replacement for CUPTI or hardware device timelines; it is the generic
 host-side layer that those adapters can feed.
+
+## License
+
+Released under the [MIT License](LICENSE).
