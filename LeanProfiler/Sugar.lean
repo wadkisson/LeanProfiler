@@ -18,6 +18,9 @@ plus one on-switch:
 * `span "name" do ...`     — manual: profile a block (dynamic name; optional metadata).
 * `profiled_main def main := ...` — the on-switch: `clear` on entry, `finish .all` on exit.
 
+For **pure** computations (numeric kernels, tensor ops), whose evaluation the optimizer would
+otherwise float out of a span, use `spanPure` (in an `IO` block) or `timePure` (from pure code).
+
 Everything is gated on the `LEAN_PROFILE` environment variable, read once at startup:
 
 ```text
@@ -57,6 +60,57 @@ span "matmul" (metadata := { phase := some "forward" }) do runMatmul
 -/
 @[inline] def span {α : Type} (name : String) (action : IO α) (metadata : Metadata := {}) : IO α :=
   if profilingEnabled then recordSpanWith name metadata action else action
+
+/-- Profile a **pure** computation, attributing its evaluation time to a span.
+
+Pure work is the trap in a strict-but-optimizing language: writing `span "k" (pure (kernel x))`
+lets the compiler *float* `kernel x` out of the timed region, so the span reads ~0 and the cost
+lands on whatever forces the value later. `spanPure` avoids this by taking a thunk and forcing it
+*inside* the span via `IO.lazyPure` (an application the optimizer cannot hoist):
+
+```lean
+let y ← spanPure "matmul" (fun _ => matmul w x)
+let y ← spanPure "matmul" (metadata := { shape := some "[512,512]" }) (fun _ => matmul w x)
+```
+
+Forcing is to **WHNF**. That fully evaluates strictly-built data (any `Array`/`FloatArray`/`Nat`/
+strict structure a numeric kernel returns). Values with lazy sub-structure (a lazy `List` spine,
+an unforced `Thunk`) are only forced at the top; force those yourself inside the thunk if needed.
+Note also that a *closed constant* expression (no runtime inputs) is floated to a top-level thunk
+and memoized, so it is timed only on first evaluation — real kernels close over their inputs and
+are unaffected. When profiling is off this is exactly `IO.lazyPure thunk` (no overhead). -/
+@[inline] def spanPure {α : Type} (name : String) (thunk : Unit → α)
+    (metadata : Metadata := {}) : IO α :=
+  span name (IO.lazyPure thunk) metadata
+
+private unsafe def timePureImpl {α : Type} (name : String) (thunk : Unit → α)
+    (metadata : Metadata := {}) : α :=
+  if profilingEnabled then
+    match unsafeIO (recordSpanWith name metadata (IO.lazyPure thunk)) with
+    | .ok a => a
+    | .error _ => thunk ()
+  else
+    thunk ()
+
+/-- Profile a pure computation **from a pure call site** — no `IO` in the signature.
+
+This is `spanPure` for code that isn't in `IO`: it returns `α`, so you can drop it into an ordinary
+pure kernel and still get its time in the report. It works by recording via unsafe IO under the
+hood (`@[implemented_by]`), so it carries the usual `unsafeIO` caveats: the compiler is free to
+reorder, duplicate, or drop the timing side effect, and closed-constant expressions may be timed
+once and memoized. Prefer `spanPure` whenever you already have an `IO` context; reach for `timePure`
+only to instrument pure code you don't want to thread `IO` through. When profiling is off it is
+exactly `thunk ()`.
+
+```lean
+def forward (x : Tensor) : Tensor :=
+  let h := timePure "attn" (fun _ => attention x)
+  timePure "mlp" (fun _ => mlp h)
+```
+-/
+@[implemented_by timePureImpl]
+def timePure {α : Type} (name : String) (thunk : Unit → α)
+    (metadata : Metadata := {}) : α := thunk ()
 
 /-- Wrap a program entry point: `clear` on entry and `finish .all` on exit (even if the body
 throws), but only when profiling is enabled. When disabled this is just `action`. -/

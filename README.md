@@ -50,6 +50,8 @@ Two profiling modes plus one on-switch:
 |------|-----|
 | `profiled def f := ...` | automatic: profile a whole function (span named after it) |
 | `span "name" do ...` | manual: profile a block — dynamic name, optional `metadata` |
+| `spanPure "name" (fun _ => ...)` | manual: profile a **pure** computation from `IO` (see below) |
+| `timePure "name" (fun _ => ...)` | manual: profile a pure computation from **pure** code (see below) |
 | `profiled_main def main := ...` | on-switch: `clear` on entry, `finish .all` on exit |
 
 One rule to remember: **wrap `main` in `profiled_main`, mark work with `profiled` / `span`, run with
@@ -94,6 +96,48 @@ def forward (layers : Array Layer) (x : Tensor) : IO Tensor := do
 `span` is gated on `LEAN_PROFILE` exactly like `profiled`, so leaving it in production code costs a
 single boolean check when profiling is off. It only emits output when the entry point is wrapped in
 `profiled_main` (which owns `clear` / `finish`).
+
+## Profiling Pure Computations
+
+Numeric kernels — matmuls, attention, layernorm — are usually **pure** functions, and pure work is
+the one thing a naive span gets wrong. Lean is strict but the compiler aggressively optimizes, so
+writing `span "matmul" (pure (matmul w x))` lets it *float* the `matmul w x` evaluation out of the
+timed region. The span then reads ~0 and the cost silently lands on whatever forces the result
+later (often the parent span). This is the pure-function gotcha.
+
+Use `spanPure` instead. It takes a **thunk** and forces it to WHNF *inside* the span, so the time
+is attributed where it belongs:
+
+```lean
+-- inside any IO block (e.g. under `profiled` / `profiled_main`)
+let h  ← spanPure "attention" (fun _ => attention x)
+let y  ← spanPure "mlp" (metadata := { phase := some "forward" }) (fun _ => mlp h)
+```
+
+The two rules that make this reliable:
+
+- **Pass a thunk (`fun _ => ...`), never the value.** `spanPure "k" (kernel x)` would evaluate
+  `kernel x` at the call site, *before* the span starts. The `fun _ =>` defers evaluation to inside.
+- Forcing is to **WHNF**, which fully evaluates any strictly-built result — `FloatArray`, `Array`,
+  `Nat`, or a strict structure, i.e. what every real kernel returns. A result with lazy
+  sub-structure (a lazy `List` spine, an unforced `Thunk`) is only forced at the top; force it
+  yourself inside the thunk if that matters.
+
+If a call site isn't in `IO` and you don't want to thread `IO` through it, use `timePure`, which has
+the same behavior but returns a plain `α`:
+
+```lean
+def forward (x : Tensor) : Tensor :=
+  let h := timePure "attention" (fun _ => attention x)
+  timePure "mlp" (fun _ => mlp h)
+```
+
+`timePure` records through unsafe IO under the hood, so it carries the usual caveats: the compiler
+may reorder, duplicate, or drop the timing side effect, and a *closed-constant* expression (one that
+closes over no runtime inputs) is floated to a top-level thunk and timed only once. Real kernels
+close over their inputs and are unaffected. Prefer `spanPure` whenever you already have `IO`; reach
+for `timePure` only for pure code you can't or don't want to lift into `IO`. Both are gated on
+`LEAN_PROFILE` and are exact no-ops (`IO.lazyPure thunk` / `thunk ()`) when profiling is off.
 
 ## Explicit Interface
 
@@ -231,7 +275,8 @@ lake exe runtime-checks
 `leanprofiler` runs a tiny CPU demo. `structured` emits fake model-style events with shape and
 device metadata. `runtime-checks` verifies the summary self-time calculation, hook metadata,
 context restoration after a failed span, concurrent event appends, independent per-thread nesting,
-and explicit cross-task parent links.
+explicit cross-task parent links, and that pure work is attributed to its own span (the `spanPure` /
+`timePure` forcing guarantee).
 
 ## What This Is Not
 

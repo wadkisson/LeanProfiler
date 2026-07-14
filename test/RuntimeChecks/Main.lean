@@ -116,6 +116,45 @@ def crossTaskParentCheck : IO Unit := do
         throw <| IO.userError "cross-task parent link was not preserved"
   | _, _ => throw <| IO.userError "missing cross-task parent/child event"
 
+/-- A strict, pure, expensive computation. `seed` is supplied at runtime so the call is not a
+closed constant the compiler can float/memoize. -/
+def heavy (n seed : Nat) : Nat := Id.run do
+  let mut acc := seed
+  for i in [0:n] do
+    acc := (acc * 1664525 + i + 1013904223) % 4294967291
+  return acc
+
+/-- The forcing mechanism `spanPure` is built on (`recordSpanWith … (IO.lazyPure …)`) must attribute
+pure evaluation time to its own span, not defer it onto whoever forces the value later. -/
+def pureAttributionCheck : IO Unit := do
+  clear
+  let seed := (← IO.monoNanosNow) % 97 + 1
+  let big ← recordSpanWith "heavy" {} (IO.lazyPure (fun _ => heavy 5_000_000 seed))
+  let small ← recordSpanWith "light" {} (IO.lazyPure (fun _ => heavy 50_000 seed))
+  -- Consume the results so nothing is dead-code-eliminated.
+  if big == 0 && small == 0 then
+    throw <| IO.userError "unexpected zero results"
+  let rows := buildSummaryRows (← getEvents)
+  match findRow "heavy" rows, findRow "light" rows with
+  | some heavyRow, some lightRow =>
+      if heavyRow.selfNs == 0 then
+        throw <| IO.userError "pure work was deferred out of its span (heavy self-time is 0)"
+      if heavyRow.selfNs ≤ lightRow.selfNs then
+        throw <| IO.userError
+          s!"pure work misattributed: heavy self {heavyRow.selfNs}ns ≤ light self {lightRow.selfNs}ns"
+  | _, _ => throw <| IO.userError "missing pure-attribution summary rows"
+
+/-- `spanPure` and `timePure` must return the correct value regardless of whether profiling is on. -/
+def pureValueCheck : IO Unit := do
+  let seed := (← IO.monoNanosNow) % 97 + 1
+  let expected := heavy 100_000 seed
+  let viaSpan ← spanPure "value-span" (fun _ => heavy 100_000 seed)
+  if viaSpan != expected then
+    throw <| IO.userError "spanPure returned the wrong value"
+  let viaPure := timePure "value-pure" (fun _ => heavy 100_000 seed)
+  if viaPure != expected then
+    throw <| IO.userError "timePure returned the wrong value"
+
 def main : IO Unit := do
   summaryCheck
   hookCheck
@@ -123,4 +162,6 @@ def main : IO Unit := do
   contextFailureCheck
   concurrentAppendCheck
   crossTaskParentCheck
+  pureAttributionCheck
+  pureValueCheck
   IO.println "runtime checks passed"
