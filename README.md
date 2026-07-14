@@ -6,9 +6,6 @@ and emits a terminal summary, a Chrome/Perfetto trace, and a self-contained HTML
 Everything is toggled by the `LEAN_PROFILE` environment variable. When it's off, instrumented calls
 cost a single boolean check.
 
-Want to see it on a real model? [`Example/`](Example/README.md) profiles a small transformer and uses
-the report to find (and fix) a bottleneck that isn't where you'd expect.
-
 ## Install
 
 Add it to your `lakefile.toml`, then run `lake update`:
@@ -86,6 +83,48 @@ For pure call sites you don't want to lift into `IO`, use `timePure` (returns a 
 via unsafe IO, so the compiler may reorder/duplicate/drop the timing and closed-constant expressions
 are timed once — prefer `spanPure` whenever you have `IO`. Both are no-ops when profiling is off.
 
+## Putting it together
+
+A realistic example: instrumenting a model-style forward pass. Each pure kernel is wrapped in
+`spanPure` (so its cost is attributed to its own span), each layer gets a runtime-named `span` (so the
+report shows one row per layer), and `profiled_main` handles setup/teardown.
+
+```lean
+import LeanProfiler
+open LeanProfiler
+
+-- Heavyweight numeric kernels are pure `FloatArray → FloatArray` functions.
+def layerNorm (x : FloatArray) : FloatArray := ...
+def attention (x : FloatArray) : FloatArray := ...
+def mlp       (x : FloatArray) : FloatArray := ...
+
+def blockForward (blk : Block) (x : FloatArray) : IO FloatArray := do
+  let fwd : Metadata := { phase := some "forward" }
+  let normed ← spanPure "ln"        (fun _ => layerNorm x)    fwd
+  let attn   ← spanPure "attn"      (fun _ => attention normed) fwd
+  let hidden ← spanPure "mlp"       (fun _ => mlp attn)       fwd
+  pure hidden
+
+profiled_main def main : IO Unit := do
+  -- Force the weights once, up front, so the cost lands in one `load.weights` span
+  -- instead of being recomputed inside the forward pass.
+  let model ← spanPure "load.weights" (fun _ => buildModel) { phase := some "setup" }
+  let mut x := embedTokens model tokens
+  for i in [0:model.blocks.size] do
+    x ← span s!"block{i}" (metadata := { phase := some "forward" }) do
+      blockForward model.blocks[i]! x
+  IO.println s!"done: {x.size} activations"
+```
+
+```bash
+LEAN_PROFILE=1 lake exe myapp    # summary + Perfetto trace + HTML report at exit
+lake exe myapp                   # off: instrumented calls are ~no-ops
+```
+
+The summary ranks spans by self-time, so a surprise bottleneck (say, an elementwise activation built
+with a `mut … push` loop that boxes every element instead of `Array.ofFn`) shows up immediately
+rather than being hidden behind the matmuls you assumed were the cost.
+
 ## Explicit interface
 
 For full control, use `LeanProfiler.Runtime` directly:
@@ -117,8 +156,6 @@ JSON in [Perfetto](https://ui.perfetto.dev).
 lake exe leanprofiler                             # tiny CPU demo
 lake exe structured                               # fake model-style events with metadata
 lake exe runtime-checks                           # correctness checks
-LEAN_PROFILE=1 lake exe transformer-demo slow     # Example/ case study, baseline
-LEAN_PROFILE=1 lake exe transformer-demo fast      # Example/ case study, optimized
 ```
 
 `runtime-checks` verifies self-time math, hooks, context restoration after failures, concurrent

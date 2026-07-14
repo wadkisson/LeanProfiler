@@ -20,11 +20,3 @@ root = "test.Structured.Main"
 [[lean_exe]]
 name = "runtime-checks"
 root = "test.RuntimeChecks.Main"
-
-[[lean_lib]]
-name = "Example"
-globs = ["Example.+"]
-
-[[lean_exe]]
-name = "transformer-demo"
-root = "Example.Main"
