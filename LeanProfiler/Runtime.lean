@@ -916,13 +916,4 @@ def finish (output : RuntimeOutput) (tracePath : String) : IO Unit := do
         IO.println s!"Lean profile trace: {tracePath} -> https://ui.perfetto.dev"
         IO.println s!"Lean profile report: {reportPathForTrace tracePath}"
 
-/-- Profile an arbitrary `IO` block and print only the terminal summary. -/
-def profileIOSummary {α : Type} (name : String) (action : IO α) : IO α := do
-  clear
-  try
-    recordSpanWith name { phase := some "manual" } action
-  finally
-    finish .summary "build/leanprofiler-trace.json"
-
-
 end LeanProfiler

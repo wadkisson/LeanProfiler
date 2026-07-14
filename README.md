@@ -44,8 +44,17 @@ open LeanProfiler
 
 ## Simple Interface
 
-Mark the functions you care about with `profiled` and your entry point with `profiled_main`. The
-span name is taken automatically from the declaration name.
+The entire user-facing surface is four names:
+
+| Name | Use |
+|------|-----|
+| `profiled_main def main := ...` | entry point: `clear` on entry, `finish .all` on exit |
+| `profiled def f := ...` | record a span named after the function |
+| `span "name" do ...` | record a span with a runtime-chosen name (loops, per layer) |
+| `spanWith "name" meta do ...` | same, with structured metadata (shapes, phase, memory) |
+
+One rule to remember: **wrap `main` in `profiled_main`, mark work with `profiled` / `span`, run with
+`LEAN_PROFILE=1`.** The span name for `profiled` is taken from the declaration name.
 
 ```lean
 import LeanProfiler
@@ -53,12 +62,9 @@ import LeanProfiler
 profiled def loadBatch (n : Nat) : IO (Array Nat) := do
   pure (Array.range n)
 
-profiled def train : IO Unit := do
+profiled_main def main : IO Unit := do
   let _ ← loadBatch 1024
   pure ()
-
-profiled_main def main : IO Unit := do
-  train
 ```
 
 Toggle profiling at runtime — no code changes:
@@ -72,9 +78,22 @@ lake exe myapp                   # profiling off: instrumented calls are ~no-ops
 - `LEAN_PROFILE_OUT` — trace output path (default `build/leanprofiler-trace.json`). The HTML report
   is written to that path followed by `.html`.
 
-`profiled_main` calls `clear` on entry and `finish .all` on exit (even if the body throws). Under
-the hood, `profiled def f ... := body` expands to `recordSpanGated "f" body`, and
-`recordSpanGated` / `withProfiledMain` are also usable directly if you prefer functions over macros.
+`profiled` names spans by the (static) function name, so all calls aggregate into one row. For a
+per-item breakdown — e.g. one row per layer of a model — use `span` with a runtime-chosen name inside
+the dispatch loop:
+
+```lean
+-- a model is data: `span layer.name` gives one row per layer, for free
+def forward (layers : Array Layer) (x : Tensor) : IO Tensor := do
+  let mut h := x
+  for layer in layers do
+    h ← spanWith layer.name { phase := some "forward" } do layer.run h
+  return h
+```
+
+`span` / `spanWith` are gated on `LEAN_PROFILE` exactly like `profiled`, so leaving them in production
+code costs a single boolean check when profiling is off. They only emit output when the entry point
+is wrapped in `profiled_main` (which owns `clear` / `finish`).
 
 ## Explicit Interface
 
