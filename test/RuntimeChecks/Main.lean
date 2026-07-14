@@ -124,8 +124,8 @@ def heavy (n seed : Nat) : Nat := Id.run do
     acc := (acc * 1664525 + i + 1013904223) % 4294967291
   return acc
 
-/-- The forcing mechanism `spanPure` is built on (`recordSpanWith … (IO.lazyPure …)`) must attribute
-pure evaluation time to its own span, not defer it onto whoever forces the value later. -/
+/-- Pure work forced inside a span (`recordSpanWith … (IO.lazyPure …)`, same mechanism as `span`)
+must attribute evaluation time to its own span, not defer it onto whoever forces the value later. -/
 def pureAttributionCheck : IO Unit := do
   clear
   let seed := (← IO.monoNanosNow) % 97 + 1
@@ -144,16 +144,13 @@ def pureAttributionCheck : IO Unit := do
           s!"pure work misattributed: heavy self {heavyRow.selfNs}ns ≤ light self {lightRow.selfNs}ns"
   | _, _ => throw <| IO.userError "missing pure-attribution summary rows"
 
-/-- `spanPure` and `timePure` must return the correct value regardless of whether profiling is on. -/
+/-- `span` must return the correct value regardless of whether profiling is on. -/
 def pureValueCheck : IO Unit := do
   let seed := (← IO.monoNanosNow) % 97 + 1
   let expected := heavy 100_000 seed
-  let viaSpan ← spanPure "value-span" (fun _ => heavy 100_000 seed)
+  let viaSpan ← span "value-span" (heavy 100_000 seed)
   if viaSpan != expected then
-    throw <| IO.userError "spanPure returned the wrong value"
-  let viaPure := timePure "value-pure" (fun _ => heavy 100_000 seed)
-  if viaPure != expected then
-    throw <| IO.userError "timePure returned the wrong value"
+    throw <| IO.userError "span returned the wrong value"
 
 def main : IO Unit := do
   summaryCheck
