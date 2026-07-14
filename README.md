@@ -54,32 +54,86 @@ trace path (default `build/leanprofiler-trace.json`); the HTML report is that pa
 
 ## Whole functions
 
-`profiled def` wraps the entire body in one span. Every call to the function contributes to the
-same summary row (static name):
+Change `def` to `profiled def`. That's the only edit — the body stays the same. Every call
+contributes to one summary row named after the function.
+
+**Before:**
 
 ```lean
-profiled def matmul (w x : FloatArray) : FloatArray := ...
-profiled def forward (model : Model) (x : FloatArray) : IO FloatArray := do
-  ...
+def loadBatch (n : Nat) : IO (Array Nat) :=
+  pure (Array.range n)
+
+def matmul (w x : FloatArray) : FloatArray :=
+  -- kernel body
+  x
+
+def main : IO Unit := do
+  let data ← loadBatch 1024
+  IO.println s!"loaded {data.size} items"
 ```
 
-Use this when you want one line in the report per function.
+**After:**
+
+```lean
+import LeanProfiler
+open LeanProfiler
+
+profiled def loadBatch (n : Nat) : IO (Array Nat) :=
+  pure (Array.range n)
+
+profiled def matmul (w x : FloatArray) : FloatArray :=
+  -- kernel body — unchanged
+  x
+
+profiled def main : IO Unit := do
+  let data ← loadBatch 1024
+  IO.println s!"loaded {data.size} items"
+```
+
+On `main`, `profiled def` also handles setup and teardown: it clears profiler state on entry and
+writes the summary, trace, and HTML report on exit. You don't call `clear` or `finish` yourself.
 
 ## Sub-regions
 
-`span` works on **any** expression — pure kernels and `IO` blocks alike. No special syntax:
+Wrap the expression you want timed with `span "name" (...)`. The code inside the parentheses is
+unchanged — pure kernels and `IO` actions use the same syntax.
+
+**Before:**
 
 ```lean
-let y ← span "matmul" (matmul w x)       -- pure: forced inside the span
-let _ ← span "save" (IO.FS.writeFile path data)   -- IO: run inside the span
+def forward (model : Model) (x : FloatArray) : IO FloatArray := do
+  let normed ← pure (layerNorm x)
+  let attn   ← pure (attention normed)
+  let hidden ← pure (mlp attn)
+  pure hidden
+
+def main : IO Unit := do
+  let model ← buildModel
+  let mut x := embedTokens model tokens
+  for i in [0:model.blocks.size] do
+    x ← blockForward model.blocks[i]! x
+  IO.println s!"done: {x.size} activations"
 ```
 
-For a per-item breakdown inside a loop, pass a runtime name:
+**After:**
 
 ```lean
-for layer in layers do
-  h ← span layer.name (layer.run h)
+def forward (model : Model) (x : FloatArray) : IO FloatArray := do
+  let normed ← span "ln"   (layerNorm x)
+  let attn   ← span "attn" (attention normed)
+  let hidden ← span "mlp"  (mlp attn)
+  pure hidden
+
+profiled def main : IO Unit := do
+  let model ← span "load.weights" (buildModel)
+  let mut x := embedTokens model tokens
+  for i in [0:model.blocks.size] do
+    x ← span s!"block{i}" (blockForward model.blocks[i]! x)
+  IO.println s!"done: {x.size} activations"
 ```
+
+Each `span` adds a row to the report. Use a runtime name like `s!"block{i}"` when you want one row
+per loop iteration instead of one aggregated row.
 
 ### Why pure work needs no special wrapper
 
@@ -90,8 +144,8 @@ correctly. Just write the expression normally; don't wrap it in `fun _ => ...`.
 
 ## Putting it together
 
-A realistic model-style forward pass: each kernel gets a `span`, the entry point is `profiled def
-main`:
+The before/after sections above combined — a model-style forward pass with per-kernel and per-block
+breakdown:
 
 ```lean
 import LeanProfiler
