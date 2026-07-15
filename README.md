@@ -56,6 +56,23 @@ One rule to remember: **wrap `main` in `profiled_main`, mark work with `profiled
 `LEAN_PROFILE=1`.** The span name for `profiled` is taken from the declaration name; pass metadata to
 a manual span with `span "name" (metadata := { ... }) do ...`.
 
+### TorchLean example
+
+The repository includes an optional, shape-checked TorchLean MLP workload. Its dimensions, batch
+size, optimizer, backend, scalar representation, and device are command-line choices. The default
+CUDA configuration is a scaling stress workload with about 100 million trainable parameters:
+
+```bash
+cd examples/torchlean
+lake -R -K cuda=true build torchlean-mlp-profile
+LEAN_PROFILE=1 LEAN_PROFILE_OUT=build/torchlean-mlp-100m.json \
+  lake -R -K cuda=true exe torchlean-mlp-profile --device cuda
+```
+
+See [`examples/torchlean`](examples/torchlean) for smaller CPU commands and the full set of scale
+options. The example has its own Lake package, so TorchLean remains outside the core profiler's
+dependency graph.
+
 ```lean
 import LeanProfiler
 
