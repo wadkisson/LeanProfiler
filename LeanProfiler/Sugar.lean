@@ -55,15 +55,18 @@ class Spannable (β : Type) (α : outParam Type) where
   toIO : β → IO α
   toSpanAction : β → IO α
 
-/-- An `IO` action — run it inside the span. -/
-instance (priority := 100) {α : Type} : Spannable (IO α) α where
-  toIO := id
-  toSpanAction := id
+/-- A pure value — force its evaluation inside the span via `IO.lazyPure`.
 
-/-- A pure value — force its evaluation inside the span via `IO.lazyPure`. -/
-instance (priority := 10000) {α : Type} : Spannable α α where
+Priority is intentionally lower than the `IO` instance: otherwise `IO α` is treated as a
+pure value of type `IO α`, the action is never run, and timings collapse to noise. -/
+instance (priority := 100) {α : Type} : Spannable α α where
   toIO := pure
   toSpanAction := fun value => IO.lazyPure (fun _ => value)
+
+/-- An `IO` action — run it inside the span. -/
+instance (priority := 1000) {α : Type} : Spannable (IO α) α where
+  toIO := id
+  toSpanAction := id
 
 /-- Backing definition for the `span` macro; prefer the macro. Records under `name` only when
 profiling is enabled, otherwise just runs the code. It also takes optional `metadata`
