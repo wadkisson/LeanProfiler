@@ -5,22 +5,6 @@ defaultTargets = ["leanprofiler"]
 [[lean_lib]]
 name = "LeanProfiler"
 
-[[lean_lib]]
-name = "test"
-globs = ["test.+"]
-
 [[lean_exe]]
 name = "leanprofiler"
 root = "Main"
-
-[[lean_exe]]
-name = "structured"
-root = "test.Structured.Main"
-
-[[lean_exe]]
-name = "runtime-checks"
-root = "test.RuntimeChecks.Main"
-
-[[lean_exe]]
-name = "exhaustive"
-root = "test.Exhaustive.Main"

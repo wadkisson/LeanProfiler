@@ -9,8 +9,6 @@ def busy (n : Nat) : IO Nat := do
   pure acc
 
 profiled def main : IO Unit := do
-  withStep 0 do
-    let _ ← span "load.batch" (busy 25_000)
-    withModule "demo.mlp" do
-      let _ ← span "linear" (busy 50_000)
-      let _ ← span "relu" (busy 15_000)
+  let _ ← span "load.batch" (busy 25_000)
+  let _ ← span "linear" (busy 50_000)
+  let _ ← span "relu" (busy 15_000)
