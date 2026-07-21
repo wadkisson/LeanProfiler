@@ -1,7 +1,6 @@
 # LeanProfiler
 
-A tiny runtime profiler for compiled Lean programs. Wrap the regions you care about; it times them
-and prints a terminal summary plus a Chrome/Perfetto JSON trace.
+A tiny runtime profiler for compiled Lean programs. Wrap the regions you care about, and LeanProfiler prints a terminal summary plus a Chrome/Perfetto JSON trace.
 
 Toggled by `LEAN_PROFILE`. When off, instrumented calls cost a single boolean check.
 
@@ -16,8 +15,7 @@ git = "https://github.com/wadkisson/LeanProfiler"
 rev = "main"
 ```
 
-Use the same toolchain as this repo (`leanprover/lean4:v4.30.0`).
-
+Use the same toolchain as this repo.
 ## Usage
 
 Two names:
@@ -64,4 +62,4 @@ spans only.
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT
