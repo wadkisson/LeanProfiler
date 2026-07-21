@@ -26,7 +26,7 @@ Two names:
 | `profiled def f := ...` | Profile a whole function. On `main`, also clears on entry and writes output on exit. |
 | `span "name" (expr)` | Profile a sub-region — any expression, pure or `IO`. |
 
-### The function by itself
+### Example:
 
 ```lean
 def loadBatch (n : Nat) : IO (Array Nat) :=
