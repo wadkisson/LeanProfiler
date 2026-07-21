@@ -49,17 +49,6 @@ lake exe myapp                  # off
 Pure expressions inside `span` are forced with `IO.lazyPure` so the optimizer cannot float work out
 of the timed region.
 
-## Demo
-
-```bash
-LEAN_PROFILE=1 lake exe leanprofiler
-```
-
-## What it isn't
-
-Not a Lean elaboration profiler (`set_option profiler`), and not a CUDA/hardware profiler — host-side
-spans only.
-
 ## License
 
 MIT
