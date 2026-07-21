@@ -16,6 +16,7 @@ rev = "main"
 ```
 
 Use the same toolchain as this repo.
+
 ## Usage
 
 Two names:
@@ -25,6 +26,19 @@ Two names:
 | `profiled def f := ...` | Profile a whole function. On `main`, also clears on entry and writes output on exit. |
 | `span "name" (expr)` | Profile a sub-region — any expression, pure or `IO`. |
 
+### The function by itself
+
+```lean
+def loadBatch (n : Nat) : IO (Array Nat) :=
+  pure (Array.range n)
+
+def main : IO Unit := do
+  let data ← loadBatch 1024
+  IO.println s!"loaded {data.size}"
+```
+
+### Option 1 — `profiled def` (time the whole function)
+
 ```lean
 import LeanProfiler
 open LeanProfiler
@@ -33,10 +47,27 @@ profiled def loadBatch (n : Nat) : IO (Array Nat) :=
   pure (Array.range n)
 
 profiled def main : IO Unit := do
-  let data ← span "load" (loadBatch 1024)
-  let sum ← span "reduce" (data.foldl (· + ·) 0)
-  IO.println s!"sum = {sum}"
+  let data ← loadBatch 1024
+  IO.println s!"loaded {data.size}"
 ```
+
+Every call to `loadBatch` becomes one summary row named `loadBatch`. `profiled def main` clears on entry and writes the report on exit.
+
+### Option 2 — `span` (time a piece inside)
+
+```lean
+import LeanProfiler
+open LeanProfiler
+
+def loadBatch (n : Nat) : IO (Array Nat) :=
+  pure (Array.range n)
+
+profiled def main : IO Unit := do
+  let data ← span "load" (loadBatch 1024)
+  IO.println s!"loaded {data.size}"
+```
+
+`loadBatch` stays a normal `def`. Only the wrapped expression is timed, under the name you chose (`load`). Still use `profiled def main` so the report is written.
 
 ```bash
 LEAN_PROFILE=1 lake exe myapp   # summary + build/leanprofiler-trace.json
