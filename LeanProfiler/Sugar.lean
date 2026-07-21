@@ -17,6 +17,9 @@ Two names:
 * `span "name" (expr)` — time any expression, pure or `IO`.
 
 Gated by `LEAN_PROFILE` (`unset`/`""`/`"0"`/`"false"` = off).
+
+`span` / `profiled` always pass a `Unit → _` thunk so pure work is forced *inside* the
+timed region (not before the timer starts).
 -/
 
 @[expose] public section
@@ -35,40 +38,38 @@ initialize profilingEnabled : Bool ← do
 initialize profileOutputPath : String ← do
   pure ((← IO.getEnv "LEAN_PROFILE_OUT").getD "build/leanprofiler-trace.json")
 
-/-- How `span` runs an expression, pure or `IO`. -/
-class Spannable (β : Type) (α : outParam Type) where
-  toIO : β → IO α
-  toSpanAction : β → IO α
+/-- How to run a body of type `γ` for result `α`. `runInsideSpan` receives a thunk. -/
+class Spannable (γ : Type) (α : outParam Type) where
+  toIO : γ → IO α
+  runInsideSpan : (Unit → γ) → IO α
 
-/-- Pure value — force evaluation inside the span via `IO.lazyPure`.
-
-Lower priority than the `IO` instance so `IO α` is not treated as a pure value. -/
+/-- Pure — force the thunk inside the span via `IO.lazyPure`. -/
 instance (priority := 100) {α : Type} : Spannable α α where
   toIO := pure
-  toSpanAction := fun value => IO.lazyPure (fun _ => value)
+  runInsideSpan := fun mk => IO.lazyPure mk
 
-/-- `IO` action — run it inside the span. -/
+/-- `IO` — run the thunk inside the span. -/
 instance (priority := 1000) {α : Type} : Spannable (IO α) α where
   toIO := id
-  toSpanAction := id
+  runInsideSpan := fun mk => mk ()
 
-/-- Record under `name` when profiling is enabled; otherwise just run the code. -/
-@[inline] def spanCore {β : Type} {α : Type} [Spannable β α]
-    (name : String) (body : β) : IO α :=
+/-- Record under `name` when profiling is on; `mk` delays the body until the span runs. -/
+@[inline] def spanCore {γ : Type} {α : Type} [Spannable γ α]
+    (name : String) (mk : Unit → γ) : IO α :=
   if profilingEnabled then
-    recordSpan name (Spannable.toSpanAction body)
+    recordSpan name (Spannable.runInsideSpan mk)
   else
-    Spannable.toIO body
+    Spannable.toIO (mk ())
 
 /-- Unsafe pure entry for `profiled def` on non-`IO` return types. -/
-unsafe def evalSpan {α : Type} [Inhabited α] (name : String) (body : α) : α :=
-  match unsafeIO (spanCore name body) with
+unsafe def evalSpan {α : Type} [Inhabited α] (name : String) (mk : Unit → α) : α :=
+  match unsafeIO (spanCore name mk) with
   | .ok a => a
   | .error e => panic e.toString
 
 /-- Time any expression under `name`. -/
 macro "span " name:term:max body:term:max : term =>
-  `(LeanProfiler.spanCore $name $body)
+  `(LeanProfiler.spanCore $name (fun _ => $body))
 
 /-- Clear on entry and `finish` on exit when profiling is enabled. -/
 def withProfiledMain {α : Type} (action : IO α) : IO α := do
@@ -100,11 +101,11 @@ macro mods:declModifiers "profiled " "def " id:declId sig:optDeclSig " := " body
     let spanName := Syntax.mkStrLit name.toString
     if optDeclSigReturnsIO? sig then
       `($mods:declModifiers def $id:declId $sig:optDeclSig :=
-          LeanProfiler.spanCore $spanName $body)
+          LeanProfiler.spanCore $spanName (fun _ => $body))
     else
       `($mods:declModifiers def $id:declId $sig:optDeclSig :=
           if LeanProfiler.profilingEnabled then
-            unsafe (LeanProfiler.evalSpan $spanName $body)
+            unsafe (LeanProfiler.evalSpan $spanName (fun _ => $body))
           else
             $body)
 
