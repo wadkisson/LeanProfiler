@@ -7,6 +7,7 @@ Authors: LeanProfiler Team
 module
 
 public import LeanProfiler.Output
+import Std.Sync.Mutex
 
 /-!
 # Profiling sessions

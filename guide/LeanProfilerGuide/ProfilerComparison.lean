@@ -37,8 +37,8 @@ lake env lean --profile MyProject/SlowModule.lean
 It reports elaboration and type-checking time by declaration. Use it when an import or theorem
 became expensive before the executable starts.
 
-The component profiler accumulates exclusive time inside instrumented elaborator and compiler
-components:
+Lean's [`profiler` option](https://lean-lang.org/doc/api/Lean/Util/Profile.html) accumulates
+exclusive time inside instrumented elaborator and compiler components:
 
 ```
 lake env lean \
@@ -49,8 +49,8 @@ lake env lean \
 
 The threshold is in milliseconds. The default is 100 milliseconds.
 
-`trace.profiler` keeps Lean's nested trace tree and can export a
-Firefox-Profiler-compatible file:
+[`trace.profiler`](https://lean-lang.org/doc/api/Lean/Util/Trace.html) times Lean's nested trace
+tree and can export a Firefox-Profiler-compatible file:
 
 ```
 lake env lean \
@@ -69,8 +69,8 @@ Two smaller tools answer local questions:
 - `IO.timeit` prints elapsed time for one `IO` action;
 - `IO.allocprof` invokes Lean's runtime allocation-profiler hook.
 
-These tools do not replace an application runtime profile. A file can elaborate quickly while its
-executable spends minutes in a training loop.
+These local timers answer a different question from an application profile. A file can elaborate
+quickly while its executable spends minutes in a training loop.
 
 # After `main`: LeanProfiler
 %%%
@@ -178,7 +178,7 @@ export a timeline. What creates an event is different:
   * PyTorch framework and supported device runtime
 *
   * User-defined range
-  * `span` or `profiled def`
+  * `span`; `profiled def` with `LeanProfiler.Syntax`
   * `record_function`
 *
   * Capture boundary
@@ -226,9 +226,8 @@ export a timeline. What creates an event is different:
   * the user or surrounding tooling defines the gate
 :::
 
-LeanProfiler is not a smaller reimplementation of PyTorch Profiler. It adds an application-level
-view for Lean programs, including code that never enters PyTorch. PyTorch Profiler supplies the
-deeper operator and device view when the work is inside PyTorch.
+LeanProfiler records the application-level view, including Lean code that never enters PyTorch.
+PyTorch Profiler supplies operator and device detail for work performed inside PyTorch.
 
 # Read the timing columns carefully
 %%%
@@ -303,7 +302,13 @@ tag := "profiler-references"
 %%%
 
 - Lean,
+  [`Lean.Util.Profile` API](https://lean-lang.org/doc/api/Lean/Util/Profile.html).
+- Lean,
+  [`Lean.Util.Trace` API](https://lean-lang.org/doc/api/Lean/Util/Trace.html).
+- Lean,
   [`Lean.Util.Profiler` API](https://lean-lang.org/doc/api/Lean/Util/Profiler.html).
+- Lean,
+  [`Init.System.IO` API](https://lean-lang.org/doc/api/Init/System/IO.html).
 - Lean,
   [Lean 4.31 profiler release note](https://lean-lang.org/doc/reference/latest/releases/v4.31.0/).
 - PyTorch,

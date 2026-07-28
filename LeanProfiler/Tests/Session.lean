@@ -6,7 +6,7 @@ Authors: LeanProfiler Team
 
 module
 
-import LeanProfiler.Sugar
+import LeanProfiler.Instrumentation
 import LeanProfiler.Tests.Support
 
 /-!

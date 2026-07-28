@@ -7,6 +7,7 @@ Authors: LeanProfiler Team
 module
 
 import LeanProfiler
+import LeanProfiler.Syntax
 import LeanProfiler.Tests.Support
 
 /-!

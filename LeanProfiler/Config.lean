@@ -6,8 +6,6 @@ Authors: LeanProfiler Team
 
 module
 
-public import Std
-
 /-!
 # Profiler configuration
 

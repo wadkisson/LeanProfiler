@@ -7,7 +7,7 @@ Authors: LeanProfiler Team
 module
 
 public import LeanProfiler.Schedule
-public import LeanProfiler.Sugar
+public import LeanProfiler.Session
 
 /-!
 # Scheduled profiling sessions

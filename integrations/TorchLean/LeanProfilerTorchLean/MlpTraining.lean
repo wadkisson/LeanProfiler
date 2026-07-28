@@ -7,7 +7,7 @@ Authors: LeanProfiler Team
 module
 
 public import LeanProfiler.Config
-import LeanProfiler.Sugar
+import LeanProfiler.Instrumentation
 import NN.Examples.Quickstart.SimpleMlpTrain
 
 /-!

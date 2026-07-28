@@ -224,7 +224,8 @@ the workspace root received `-K cuda=true`.
 
 When the command line contains `--device cuda`, the runner uses `Cuda.spanHooks`. The hook checks
 TorchLean's native runtime, samples its buffer allocator, runs the model, calls
-`cudaDeviceSynchronize`, and samples the allocator again:
+[`cudaDeviceSynchronize`](https://docs.nvidia.com/cuda/cuda-runtime-api/group__CUDART__DEVICE.html),
+and samples the allocator again:
 
 ![A synchronized LeanProfiler host span around CUDA launches, copies, kernels, and final synchronization](../../Assets/cuda-timing-boundary.svg)
 

@@ -75,6 +75,7 @@ header {
 }
 
 #toc {
+  box-sizing: border-box;
   padding: 1.35rem 1rem 2rem;
   border-right: 0;
   background: var(--verso-toc-background-color);

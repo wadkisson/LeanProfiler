@@ -7,7 +7,7 @@ Authors: LeanProfiler Team
 module
 
 public import LeanProfiler.Analysis.Validation
-import Std.Data.HashMap
+public import Std.Data.HashMap.Basic
 
 /-!
 # Inclusive and exclusive timing

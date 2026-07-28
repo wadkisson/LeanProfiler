@@ -62,6 +62,18 @@ label shown in Perfetto.
 
 Without `LEAN_PROFILE=1`, the same action runs without retaining spans or writing reports.
 
+The umbrella import contains the runtime API, report writers, schedules, and summary comparison.
+Three narrower features use explicit imports:
+
+```lean
+import LeanProfiler.Syntax  -- `profiled def`
+import LeanProfiler.CLI     -- embeddable command router
+import LeanProfiler.Proofs  -- laws about schedules, comparisons, and timing analysis
+```
+
+Most applications need only `import LeanProfiler`. Keeping the command syntax separate avoids
+loading Lean's compiler front end into an ordinary runtime executable.
+
 ## Try the examples
 
 ```sh

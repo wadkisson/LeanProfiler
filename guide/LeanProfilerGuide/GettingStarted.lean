@@ -201,9 +201,14 @@ tag := "io-timing-boundary"
 unevaluated until a later action prints, stores, or passes it to foreign code. Put the span around
 the action that actually forces the work.
 
-The `profiled def` syntax keeps a small `IO` function concise:
+The optional `profiled def` syntax keeps a small `IO` function concise. It has its own import
+because defining a command requires Lean's compiler front end:
 
 ```
+import LeanProfiler.Syntax
+
+open LeanProfiler
+
 profiled def loadBatch : IO Unit := do
   IO.sleep 2
 ```

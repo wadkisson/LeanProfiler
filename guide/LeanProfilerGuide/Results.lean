@@ -208,8 +208,9 @@ nanoseconds, duplicate keys, inconsistent totals, and malformed retained-index p
 tag := "trace-event-units"
 %%%
 
-The summary stores integer nanoseconds and declares a monotonic clock. Trace Event uses
-microseconds, so the exporter writes fractional microseconds:
+The summary stores integer nanoseconds and declares a monotonic clock. The
+[Trace Event format](https://perfetto.dev/docs/getting-started/other-formats) uses microseconds, so
+the exporter writes fractional microseconds:
 
 ```
 1234 ns  →  "ts": 1.234

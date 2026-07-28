@@ -7,7 +7,8 @@ Authors: LeanProfiler Team
 module
 
 public import LeanProfiler.Runtime.Process
-import Std.Sync
+public import Std.Data.HashMap.Basic
+public import Std.Sync.Mutex
 
 /-!
 # Capture state and context

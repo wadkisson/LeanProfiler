@@ -7,6 +7,7 @@ Authors: LeanProfiler Team
 module
 
 import LeanProfiler.ScheduledSession
+import LeanProfiler.Instrumentation
 import LeanProfiler.Tests.Support
 
 /-!
