@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="344" viewBox="0 0 1120 344" role="img" aria-labelledby="cuda-title cuda-desc">
+  <title id="cuda-title">What a synchronized CUDA span measures</title>
+  <desc id="cuda-desc">A LeanProfiler span covers host setup, launches, queue delay, device execution, and final synchronization as one elapsed interval. PyTorch Profiler with CUPTI can expose the individual runtime calls, memory copies, and kernels.</desc>
+  <defs>
+    <marker id="cuda-arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#7b8794"/>
+    </marker>
+  </defs>
+  <rect width="100%" height="100%" fill="#fbfcfe" rx="8"/>
+  <text x="24" y="34" font-family="system-ui, sans-serif" font-size="20" font-weight="700" fill="#152536">What a synchronized CUDA span measures</text>
+  <text x="24" y="57" font-family="system-ui, sans-serif" font-size="13" fill="#58677a">LeanProfiler reports one application boundary; PyTorch and CUPTI can resolve activity inside it.</text>
+
+  <text x="24" y="112" font-family="system-ui, sans-serif" font-size="13" font-weight="700" fill="#152536">Lean host</text>
+  <line x1="132" y1="108" x2="1060" y2="108" stroke="#aeb8c4" stroke-width="2" marker-end="url(#cuda-arrow)"/>
+  <rect x="164" y="86" width="170" height="44" rx="6" fill="#eef3f8" stroke="#aebed0"/><text x="249" y="113" text-anchor="middle" font-family="system-ui, sans-serif" font-size="12" fill="#294d73">prepare and launch</text>
+  <rect x="342" y="86" width="430" height="44" rx="6" fill="#f3f5f7" stroke="#d0d7df"/><text x="557" y="113" text-anchor="middle" font-family="system-ui, sans-serif" font-size="12" fill="#58677a">host continues / waits</text>
+  <rect x="780" y="86" width="238" height="44" rx="6" fill="#fff0d9" stroke="#dfbd8b"/><text x="899" y="113" text-anchor="middle" font-family="system-ui, sans-serif" font-size="12" fill="#9a560f">cudaDeviceSynchronize</text>
+
+  <text x="24" y="202" font-family="system-ui, sans-serif" font-size="13" font-weight="700" fill="#152536">CUDA device</text>
+  <line x1="132" y1="198" x2="1060" y2="198" stroke="#aeb8c4" stroke-width="2" marker-end="url(#cuda-arrow)"/>
+  <rect x="376" y="176" width="112" height="44" rx="6" fill="#e9f5f3" stroke="#8cc9c3"/><text x="432" y="203" text-anchor="middle" font-family="system-ui, sans-serif" font-size="12" fill="#145f59">H2D copy</text>
+  <rect x="502" y="176" width="132" height="44" rx="6" fill="#dcefeb" stroke="#72b8af"/><text x="568" y="203" text-anchor="middle" font-family="system-ui, sans-serif" font-size="12" fill="#145f59">kernel A</text>
+  <rect x="648" y="176" width="96" height="44" rx="6" fill="#dcefeb" stroke="#72b8af"/><text x="696" y="203" text-anchor="middle" font-family="system-ui, sans-serif" font-size="12" fill="#145f59">kernel B</text>
+  <rect x="758" y="176" width="112" height="44" rx="6" fill="#e9f5f3" stroke="#8cc9c3"/><text x="814" y="203" text-anchor="middle" font-family="system-ui, sans-serif" font-size="12" fill="#145f59">D2H copy</text>
+
+  <rect x="154" y="74" width="874" height="162" rx="8" fill="none" stroke="#187d75" stroke-width="3"/>
+  <text x="164" y="255" font-family="system-ui, sans-serif" font-size="12" font-weight="700" fill="#145f59">LeanProfiler + TorchLean CUDA hook</text>
+  <text x="450" y="255" font-family="system-ui, sans-serif" font-size="12" fill="#425466">one elapsed, device-synchronized application span</text>
+
+  <line x1="376" y1="282" x2="870" y2="282" stroke="#ba6b18" stroke-width="3"/>
+  <line x1="376" y1="274" x2="376" y2="290" stroke="#ba6b18" stroke-width="3"/><line x1="870" y1="274" x2="870" y2="290" stroke="#ba6b18" stroke-width="3"/>
+  <text x="24" y="307" font-family="system-ui, sans-serif" font-size="12" font-weight="700" fill="#9a560f">PyTorch Profiler + CUPTI</text>
+  <text x="205" y="307" font-family="system-ui, sans-serif" font-size="12" fill="#425466">individual supported runtime, copy, and kernel activity inside the foreign runtime</text>
+</svg>

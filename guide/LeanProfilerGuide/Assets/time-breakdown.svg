@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="366" viewBox="0 0 1120 366" role="img" aria-labelledby="breakdown-title breakdown-desc">
+  <title id="breakdown-title">Inclusive and self time in the nested example</title>
+  <desc id="breakdown-desc">Horizontal bars compare inclusive duration with self duration for the root, model forward, and input load summary rows.</desc>
+  <rect width="100%" height="100%" fill="#fbfcfe" rx="8"/>
+  <text x="24" y="32" font-family="system-ui, sans-serif" font-size="20" font-weight="700" fill="#152536">Where the recorded time went</text>
+  <text x="24" y="54" font-family="system-ui, sans-serif" font-size="13" fill="#58677a">Outlined bars show inclusive time; solid bars show self time after same-thread children are removed.</text>
+  <rect x="24" y="72" width="18" height="10" rx="2" fill="#dce5ee" stroke="#aebed0"/>
+  <text x="50" y="82" font-family="system-ui, sans-serif" font-size="12" fill="#58677a">inclusive</text>
+  <rect x="126" y="72" width="18" height="10" rx="2" fill="#425466"/>
+  <text x="152" y="82" font-family="system-ui, sans-serif" font-size="12" fill="#58677a">self</text>
+  <text x="24" y="117" font-family="system-ui, sans-serif" font-size="14" font-weight="650" fill="#152536">example.nested-spans</text>
+  <text x="24" y="139" font-family="system-ui, sans-serif" font-size="12" fill="#58677a">1 call</text>
+  <g aria-label="example.nested-spans; inclusive 18.44 ms; self 89.89 us; 1 calls"><rect x="270" y="100" width="650" height="32" rx="5" fill="#dce5ee" stroke="#aebed0" stroke-width="1"><title>example.nested-spans; inclusive 18.44 ms; self 89.89 us; 1 calls</title></rect><rect x="270" y="109" width="3" height="14" rx="4" fill="#425466"><title>example.nested-spans; inclusive 18.44 ms; self 89.89 us; 1 calls</title></rect></g>
+  <text x="938" y="111" font-family="ui-monospace, monospace" font-size="11" fill="#58677a">total 18.44 ms</text>
+  <text x="938" y="129" font-family="ui-monospace, monospace" font-size="11" fill="#425466">self  89.89 us</text>
+  <text x="24" y="195" font-family="system-ui, sans-serif" font-size="14" font-weight="650" fill="#152536">model.forward</text>
+  <text x="24" y="217" font-family="system-ui, sans-serif" font-size="12" fill="#58677a">3 calls</text>
+  <g aria-label="model.forward; inclusive 12.17 ms; self 12.17 ms; 3 calls"><rect x="270" y="178" width="429" height="32" rx="5" fill="#dce5ee" stroke="#aebed0" stroke-width="1"><title>model.forward; inclusive 12.17 ms; self 12.17 ms; 3 calls</title></rect><rect x="270" y="187" width="429" height="14" rx="4" fill="#168c80"><title>model.forward; inclusive 12.17 ms; self 12.17 ms; 3 calls</title></rect></g>
+  <text x="938" y="189" font-family="ui-monospace, monospace" font-size="11" fill="#58677a">total 12.17 ms</text>
+  <text x="938" y="207" font-family="ui-monospace, monospace" font-size="11" fill="#168c80">self  12.17 ms</text>
+  <text x="24" y="273" font-family="system-ui, sans-serif" font-size="14" font-weight="650" fill="#152536">input.load</text>
+  <text x="24" y="295" font-family="system-ui, sans-serif" font-size="12" fill="#58677a">3 calls</text>
+  <g aria-label="input.load; inclusive 6.18 ms; self 6.18 ms; 3 calls"><rect x="270" y="256" width="217" height="32" rx="5" fill="#dce5ee" stroke="#aebed0" stroke-width="1"><title>input.load; inclusive 6.18 ms; self 6.18 ms; 3 calls</title></rect><rect x="270" y="265" width="217" height="14" rx="4" fill="#d97706"><title>input.load; inclusive 6.18 ms; self 6.18 ms; 3 calls</title></rect></g>
+  <text x="938" y="267" font-family="ui-monospace, monospace" font-size="11" fill="#58677a">total 6.18 ms</text>
+  <text x="938" y="285" font-family="ui-monospace, monospace" font-size="11" fill="#d97706">self  6.18 ms</text>
+</svg>

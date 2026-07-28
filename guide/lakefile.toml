@@ -1,0 +1,26 @@
+name = "leanprofiler-guide"
+defaultTargets = ["LeanProfilerGuide", "leanprofiler-guide"]
+builtinLint = true
+
+[leanOptions]
+linter.all = true
+
+[[require]]
+name = "verso"
+git = "https://github.com/leanprover/verso"
+rev = "v4.32.0"
+
+[[require]]
+name = "LeanProfiler"
+path = ".."
+
+[[lean_lib]]
+name = "LeanProfilerGuide"
+
+[[lean_exe]]
+name = "leanprofiler-guide"
+root = "LeanProfilerGuideMain"
+
+[[lean_exe]]
+name = "leanprofiler-guide-assets"
+root = "LeanProfilerGuideAssetsMain"

@@ -1,0 +1,153 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Check Lean toolchain parity
+        run: |
+          cmp lean-toolchain guide/lean-toolchain
+          cmp lean-toolchain integrations/TorchLean/lean-toolchain
+      - uses: leanprover/lean-action@v1
+        with:
+          build: true
+          test: true
+          lint: false
+      - name: Run all builtin Lean linters
+        run: |
+          lake lint --linters=.all \
+            LeanProfiler \
+            Main \
+            TestMain \
+            Examples.AsyncCompletion \
+            Examples.NestedWorkload \
+            Examples.NestedSpans \
+            Examples.RegressionWalkthrough \
+            Examples.ScheduledSteps
+      - name: Build core examples
+        run: |
+          lake build \
+            leanprofiler_nested_example \
+            leanprofiler_async_example \
+            leanprofiler_schedule_example \
+            leanprofiler_regression_example
+      - name: Run the regression walkthrough
+        run: |
+          lake exe leanprofiler_regression_example
+          test -s build/regression-walkthrough/baseline-summary.json
+          test -s build/regression-walkthrough/candidate-summary.json
+          test -s build/regression-walkthrough/comparison.json
+
+  guide:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: leanprover/lean-action@v1
+        with:
+          lake-package-directory: guide
+          build: true
+          test: false
+          lint: false
+      - name: Lint the guide
+        working-directory: guide
+        run: |
+          lake lint --linters=.all \
+            LeanProfilerGuide \
+            LeanProfilerGuideMain \
+            LeanProfilerGuideAssetsMain
+      - name: Regenerate checked-in figures
+        working-directory: guide
+        run: |
+          lake exe leanprofiler-guide-assets
+          git diff --exit-code -- LeanProfilerGuide/Assets
+      - name: Render the Verso guide
+        working-directory: guide
+        run: |
+          rm -rf build/guide
+          lake exe leanprofiler-guide --output build/guide
+          test -s build/guide/html-multi/index.html
+          for asset in \
+            guide.css \
+            profiling-workflow.svg \
+            nested-spans-timeline.svg \
+            time-breakdown.svg \
+            p95-comparison.svg \
+            capture-schedule.svg \
+            profiler-scope.svg \
+            torchlean-prediction-latency.svg \
+            cuda-timing-boundary.svg
+          do
+            test -s "build/guide/html-multi/Assets/$asset"
+          done
+          for chapter in \
+            Record-your-first-run \
+            Design-the-capture \
+            Read-the-trace-and-summary \
+            Compare-two-runs \
+            Choose-the-right-profiler \
+            Profile-TorchLean
+          do
+            test -s "build/guide/html-multi/$chapter/index.html"
+          done
+          grep -R -q '<table class="tabular"' build/guide/html-multi
+      - name: Configure GitHub Pages
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        uses: actions/configure-pages@v5
+      - name: Upload Verso guide
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: guide/build/guide/html-multi
+
+  torchlean-integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: leanprover/lean-action@v1
+        with:
+          lake-package-directory: integrations/TorchLean
+          build: true
+          test: true
+          lint: false
+      - name: Lint the TorchLean integration
+        working-directory: integrations/TorchLean
+        run: |
+          lake lint \
+            LeanProfilerTorchLean \
+            LeanProfilerTorchLean.CommandMetadata \
+            LeanProfilerTorchLean.Cuda \
+            LeanProfilerTorchLean.Executables.MlpTraining \
+            LeanProfilerTorchLean.Executables.Runner \
+            LeanProfilerTorchLean.Tests.Main
+      - name: Run the TorchLean MLP profile
+        working-directory: integrations/TorchLean
+        env:
+          LEAN_PROFILE: "1"
+          LEAN_PROFILE_OUT: build/ci-mlp-trace.json
+          LEAN_PROFILE_SUMMARY_OUT: build/ci-mlp-summary.json
+        run: lake exe leanprofiler_torchlean_mlp
+
+  deploy-pages:
+    name: Deploy GitHub Pages
+    needs: guide
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy Verso guide
+        id: deployment
+        uses: actions/deploy-pages@v4

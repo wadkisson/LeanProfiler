@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "captured_on": "2026-07-24",
+  "lean_toolchain": "leanprover/lean4:v4.32.0",
+  "repository_revision": "def83c733414e30c2f6a8f77324e10d58858aecc",
+  "platform": "Linux x86_64",
+  "workload": "Examples.NestedSpans",
+  "baseline": {
+    "steps": 3,
+    "load_delay_ms": 2,
+    "forward_delay_ms": 4
+  },
+  "candidate": {
+    "steps": 3,
+    "load_delay_ms": 2,
+    "forward_delay_ms": 10
+  },
+  "comparison": {
+    "metric": "p95_ns",
+    "absolute_tolerance": 500000,
+    "relative_tolerance_bps": 1000
+  },
+  "note": "Both artifacts came from real executions of the same workload in an isolated checkout. The candidate changed only the example's forward delay. Timings are observations from these runs, not reference performance."
+}

@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "captured_on": "2026-07-27",
+  "leanprofiler_revision": "315ae3630b638a5734ac84f7bee5106eb0aa59de",
+  "torchlean_revision": "14bc499bea7931546655bf9e45e235be9e2134fb",
+  "lean_toolchain": "leanprover/lean4:v4.32.0",
+  "platform": "Linux x86_64",
+  "workload": "LeanProfiler.TorchLean.MlpTraining",
+  "configuration": {
+    "model": "TorchLean quickstart 2-8-1 MLP",
+    "parameters": 33,
+    "training_steps": 20,
+    "batch_size": 5,
+    "prediction_warmups": 1,
+    "measured_predictions": 10,
+    "backend": "eager",
+    "dtype": "Float",
+    "device": "cpu"
+  },
+  "result": {
+    "mean_loss_before": 1.349908,
+    "mean_loss_after": 0.040271
+  },
+  "note": "This is one real local capture used to explain the artifact format and latency distribution. Its timings are not a portable TorchLean benchmark."
+}

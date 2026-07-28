@@ -1,0 +1,38 @@
+name = "LeanProfiler"
+version = "0.1.0"
+defaultTargets = ["LeanProfiler", "leanprofiler"]
+testDriver = "leanprofiler_tests"
+builtinLint = true
+
+[leanOptions]
+linter.all = true
+
+[[lean_lib]]
+name = "LeanProfiler"
+
+[[lean_lib]]
+name = "Examples"
+
+[[lean_exe]]
+name = "leanprofiler"
+root = "Main"
+
+[[lean_exe]]
+name = "leanprofiler_tests"
+root = "TestMain"
+
+[[lean_exe]]
+name = "leanprofiler_nested_example"
+root = "Examples.NestedSpans"
+
+[[lean_exe]]
+name = "leanprofiler_async_example"
+root = "Examples.AsyncCompletion"
+
+[[lean_exe]]
+name = "leanprofiler_schedule_example"
+root = "Examples.ScheduledSteps"
+
+[[lean_exe]]
+name = "leanprofiler_regression_example"
+root = "Examples.RegressionWalkthrough"
