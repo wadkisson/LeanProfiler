@@ -16,10 +16,10 @@ tag := "results"
 %%%
 
 The nested example recorded seven events on one Lean thread. Its trace preserves the order of the
-run: each input load is followed by one forward pass, all under one root event. This timeline is
+run: each source read is followed by one analysis pass, all under one root event. This timeline is
 generated from the checked-in Trace Event file:
 
-![A nested timeline with one root span and alternating input.load and model.forward child spans](../../Assets/nested-spans-timeline.svg)
+![A nested timeline with one root span and alternating source.read and source.analyze child spans](../../Assets/nested-spans-timeline.svg)
 
 The capture came from one real run on Linux with Lean 4.32.0. Its names, nesting, and metadata come
 from the program. Its durations are observations, not reference performance.
@@ -32,20 +32,20 @@ The summary collapses the repeated calls into three rows. The same run printed t
 writing its two files:
 
 ```
-Lean profile: 7 events, 1 threads, window 18.44 ms,
-recorded thread time 18.44 ms, 290 Lean heartbeats
-Process resources: user CPU 0 ms, system CPU 0 ms, peak RSS 59528 KiB, context switches 6
+Lean profile: 7 events, 1 threads, window 18.55 ms,
+recorded thread time 18.55 ms, 287 Lean heartbeats
+Process resources: user CPU 0 ms, system CPU 0 ms, peak RSS 150712 KiB, context switches 6
 
 Name                                      Self       Total  Calls      Mean       P95  Self HB      %
-model.forward [phase=forward, module=en…  12.17 ms   12.17 ms      3   4.05 ms   4.06 ms        6  66.0%
-input.load [phase=input, activity=load]    6.18 ms    6.18 ms      3   2.06 ms   2.06 ms        6  33.5%
-example.nested-spans                      89.89 us   18.44 ms      1  18.44 ms  18.44 ms      278   0.4%
+source.analyze [phase=analysis, module…  12.22 ms   12.22 ms      3   4.07 ms   4.08 ms        6  65.8%
+source.read [phase=read, activity=files…  6.21 ms    6.21 ms      3   2.07 ms   2.08 ms        6  33.4%
+example.source-indexer                   114.82 us   18.55 ms      1  18.55 ms  18.55 ms      275   0.6%
 
 Trace: build/leanprofiler-trace.json
 Summary: build/leanprofiler-summary.json
 ```
 
-The forward calls account for about two thirds of recorded thread time and the loads account for
+The analysis calls account for about two thirds of recorded thread time and the reads account for
 about one third. The enclosing root spans the full run, but almost all of that interval belongs to
 its children:
 
@@ -133,24 +133,24 @@ The saved summary contains this real row:
 ```
 {
   "key": {
-    "name": "model.forward",
-    "phase": "forward",
+    "name": "source.analyze",
+    "phase": "analysis",
     "activity": null,
     "backend": null,
     "dtype": null,
     "device": null,
-    "module": "encoder.block"
+    "module": "indexer"
   },
   "calls": 3,
-  "self_ns": 12178684,
-  "total_ns": 12178684,
-  "mean_ns": 4059561,
-  "p95_ns": 4060907,
-  "share_permille": 660
+  "self_ns": 12223861,
+  "total_ns": 12223861,
+  "mean_ns": 4074620,
+  "p95_ns": 4081433,
+  "share_permille": 658
 }
 ```
 
-The three calls lasted about four milliseconds each because this example sleeps for four
+The three analysis calls lasted about four milliseconds each because this example sleeps for four
 milliseconds. Scheduler and timer behavior account for the extra time.
 
 The [complete summary](../../Assets/nested-spans-summary.json) includes all required version-1

@@ -13,14 +13,14 @@
 
   <rect x="24" y="92" width="184" height="112" rx="7" fill="#ffffff" stroke="#cfd8e3" stroke-width="2"/>
   <text x="44" y="121" font-family="system-ui, sans-serif" font-size="14" font-weight="700" fill="#152536">1  Ask</text>
-  <text x="44" y="150" font-family="system-ui, sans-serif" font-size="13" fill="#425466">Why did training</text>
+  <text x="44" y="150" font-family="system-ui, sans-serif" font-size="13" fill="#425466">Why did this command</text>
   <text x="44" y="171" font-family="system-ui, sans-serif" font-size="13" fill="#425466">become slower?</text>
 
   <line x1="216" y1="148" x2="238" y2="148" stroke="#7b8794" stroke-width="2" marker-end="url(#workflow-arrow)"/>
   <rect x="248" y="92" width="184" height="112" rx="7" fill="#ffffff" stroke="#cfd8e3" stroke-width="2"/>
   <text x="268" y="121" font-family="system-ui, sans-serif" font-size="14" font-weight="700" fill="#152536">2  Name boundaries</text>
-  <text x="268" y="150" font-family="ui-monospace, monospace" font-size="12" fill="#187d75">batch.load</text>
-  <text x="268" y="171" font-family="ui-monospace, monospace" font-size="12" fill="#187d75">model.forward</text>
+  <text x="268" y="150" font-family="ui-monospace, monospace" font-size="12" fill="#187d75">source.parse</text>
+  <text x="268" y="171" font-family="ui-monospace, monospace" font-size="12" fill="#187d75">index.write</text>
 
   <line x1="440" y1="148" x2="462" y2="148" stroke="#7b8794" stroke-width="2" marker-end="url(#workflow-arrow)"/>
   <rect x="472" y="92" width="184" height="112" rx="7" fill="#ffffff" stroke="#cfd8e3" stroke-width="2"/>

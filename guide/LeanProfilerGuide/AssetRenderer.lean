@@ -116,6 +116,8 @@ private def xmlEscape (value : String) : String :=
 private def phaseColor : Option String → String
   | some "forward" => "#168c80"
   | some "input" => "#d97706"
+  | some "analysis" => "#168c80"
+  | some "read" => "#d97706"
   | some "backward" => "#8b5cf6"
   | some "training" => "#6d5cae"
   | some "inference" => "#168c80"
@@ -153,14 +155,14 @@ private def workflowSvg : String :=
 
   <rect x="24" y="92" width="184" height="112" rx="7" fill="#ffffff" stroke="#cfd8e3" stroke-width="2"/>
   <text x="44" y="121" font-family="system-ui, sans-serif" font-size="14" font-weight="700" fill="#152536">1  Ask</text>
-  <text x="44" y="150" font-family="system-ui, sans-serif" font-size="13" fill="#425466">Why did training</text>
+  <text x="44" y="150" font-family="system-ui, sans-serif" font-size="13" fill="#425466">Why did this command</text>
   <text x="44" y="171" font-family="system-ui, sans-serif" font-size="13" fill="#425466">become slower?</text>
 
   <line x1="216" y1="148" x2="238" y2="148" stroke="#7b8794" stroke-width="2" marker-end="url(#workflow-arrow)"/>
   <rect x="248" y="92" width="184" height="112" rx="7" fill="#ffffff" stroke="#cfd8e3" stroke-width="2"/>
   <text x="268" y="121" font-family="system-ui, sans-serif" font-size="14" font-weight="700" fill="#152536">2  Name boundaries</text>
-  <text x="268" y="150" font-family="ui-monospace, monospace" font-size="12" fill="#187d75">batch.load</text>
-  <text x="268" y="171" font-family="ui-monospace, monospace" font-size="12" fill="#187d75">model.forward</text>
+  <text x="268" y="150" font-family="ui-monospace, monospace" font-size="12" fill="#187d75">source.parse</text>
+  <text x="268" y="171" font-family="ui-monospace, monospace" font-size="12" fill="#187d75">index.write</text>
 
   <line x1="440" y1="148" x2="462" y2="148" stroke="#7b8794" stroke-width="2" marker-end="url(#workflow-arrow)"/>
   <rect x="472" y="92" width="184" height="112" rx="7" fill="#ffffff" stroke="#cfd8e3" stroke-width="2"/>
@@ -212,7 +214,7 @@ private def timelineSvg (spans : Array TraceSpan) : String := Id.run do
     "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
     s!"<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{width}\" height=\"{height}\" viewBox=\"0 0 {width} {height}\" role=\"img\" aria-labelledby=\"timeline-title timeline-desc\">",
     "  <title id=\"timeline-title\">Nested spans from the LeanProfiler example</title>",
-    "  <desc id=\"timeline-desc\">One root span contains three alternating input load and model forward spans on one Lean thread. Horizontal position and width show elapsed time.</desc>",
+    "  <desc id=\"timeline-desc\">One root span contains three alternating source-read and source-analysis spans on one Lean thread. Horizontal position and width show elapsed time.</desc>",
     "  <rect width=\"100%\" height=\"100%\" fill=\"#fbfcfe\" rx=\"12\"/>",
     "  <text x=\"24\" y=\"31\" font-family=\"system-ui, sans-serif\" font-size=\"20\" font-weight=\"700\" fill=\"#152536\">Nested span timeline</text>",
     s!"  <text x=\"24\" y=\"53\" font-family=\"system-ui, sans-serif\" font-size=\"13\" fill=\"#58677a\">{spans.size} spans · {threads.size} Lean thread · {xmlEscape (formatDuration window)} window</text>"
@@ -262,7 +264,7 @@ private def breakdownSvg (summary : SummaryArtifact) : String := Id.run do
     "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
     s!"<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{width}\" height=\"{height}\" viewBox=\"0 0 {width} {height}\" role=\"img\" aria-labelledby=\"breakdown-title breakdown-desc\">",
     "  <title id=\"breakdown-title\">Inclusive and self time in the nested example</title>",
-    "  <desc id=\"breakdown-desc\">Horizontal bars compare inclusive duration with self duration for the root, model forward, and input load summary rows.</desc>",
+    "  <desc id=\"breakdown-desc\">Horizontal bars compare inclusive duration with self duration for the root, source-analysis, and source-read summary rows.</desc>",
     "  <rect width=\"100%\" height=\"100%\" fill=\"#fbfcfe\" rx=\"8\"/>",
     "  <text x=\"24\" y=\"32\" font-family=\"system-ui, sans-serif\" font-size=\"20\" font-weight=\"700\" fill=\"#152536\">Where the recorded time went</text>",
     "  <text x=\"24\" y=\"54\" font-family=\"system-ui, sans-serif\" font-size=\"13\" fill=\"#58677a\">Outlined bars show inclusive time; solid bars show self time after same-thread children are removed.</text>",
@@ -316,7 +318,7 @@ private def comparisonSvg (comparison : PerformanceComparison) : String := Id.ru
     "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
     s!"<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{width}\" height=\"{height}\" viewBox=\"0 0 {width} {height}\" role=\"img\" aria-labelledby=\"comparison-title comparison-desc\">",
     "  <title id=\"comparison-title\">Baseline and candidate p95 comparison</title>",
-    "  <desc id=\"comparison-desc\">Paired dots compare p95 duration for three span groups. The candidate increases the forward delay, causing model.forward and the enclosing example span to regress.</desc>",
+    "  <desc id=\"comparison-desc\">Paired dots compare p95 duration for three span groups. The candidate increases the analysis delay, causing source.analyze and the enclosing example span to regress.</desc>",
     "  <rect width=\"100%\" height=\"100%\" fill=\"#fbfcfe\" rx=\"12\"/>",
     "  <text x=\"24\" y=\"31\" font-family=\"system-ui, sans-serif\" font-size=\"20\" font-weight=\"700\" fill=\"#152536\">p95 comparison</text>",
     "  <text x=\"24\" y=\"53\" font-family=\"system-ui, sans-serif\" font-size=\"13\" fill=\"#58677a\">Policy: 0.5 ms absolute and 10% relative allowance; an increase must cross both.</text>",
@@ -376,16 +378,16 @@ private def scheduleSvg : String :=
   <rect x="944" y="88" width="66" height="62" rx="6" fill="#e9f5f3"/><text x="977" y="115" text-anchor="middle" font-family="system-ui, sans-serif" font-size="12" fill="#145f59">record</text><text x="977" y="137" text-anchor="middle" font-family="ui-monospace, monospace" font-size="11" fill="#145f59">12</text>
   <rect x="1016" y="88" width="70" height="62" rx="6" fill="#187d75"/><text x="1051" y="115" text-anchor="middle" font-family="system-ui, sans-serif" font-size="12" font-weight="650" fill="#ffffff">save</text><text x="1051" y="137" text-anchor="middle" font-family="ui-monospace, monospace" font-size="11" fill="#ffffff">13</text>
   <text x="24" y="205" font-family="system-ui, sans-serif" font-size="13" fill="#425466">Warmup executes the workload without retaining measurements. Each save step closes one active capture.</text>
-  <text x="24" y="228" font-family="system-ui, sans-serif" font-size="12" fill="#58677a">The schedule decides when to measure; the surrounding loop still owns the model state and workload.</text>
+  <text x="24" y="228" font-family="system-ui, sans-serif" font-size="12" fill="#58677a">The schedule decides when to measure; the surrounding loop still owns the application state and workload.</text>
 </svg>
 "##
 
-/-- Render the observation boundary of Lean, LeanProfiler, and PyTorch profiling tools. -/
+/-- Render the observation boundaries of Lean, application, and foreign-runtime profiling tools. -/
 private def profilerScopeSvg : String :=
   r##"<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="1120" height="430" viewBox="0 0 1120 430" role="img" aria-labelledby="scope-title scope-desc">
-  <title id="scope-title">Observation boundaries of Lean profilers, LeanProfiler, and PyTorch Profiler</title>
-  <desc id="scope-desc">Three columns show that Lean profilers observe elaboration and compilation, LeanProfiler observes named application regions and Lean heartbeats, and PyTorch Profiler observes framework operators and supported device activity.</desc>
+  <title id="scope-title">Observation boundaries of Lean, application, and foreign-runtime profilers</title>
+  <desc id="scope-desc">Three columns show that Lean profilers observe elaboration and compilation, LeanProfiler observes named application regions and Lean heartbeats, and foreign-runtime profilers observe native library or device activity.</desc>
   <rect width="100%" height="100%" fill="#fbfcfe" rx="8"/>
   <text x="24" y="34" font-family="system-ui, sans-serif" font-size="20" font-weight="700" fill="#152536">Three views of one program</text>
   <text x="24" y="57" font-family="system-ui, sans-serif" font-size="13" fill="#58677a">Each profiler begins and ends at a different boundary.</text>
@@ -407,12 +409,12 @@ private def profilerScopeSvg : String :=
   <text x="418" y="342" font-family="ui-monospace, monospace" font-size="12" fill="#58677a">span · profile · compare</text>
 
   <rect x="764" y="88" width="332" height="272" rx="8" fill="#ffffff" stroke="#dfbd8b" stroke-width="2"/>
-  <text x="788" y="122" font-family="system-ui, sans-serif" font-size="17" font-weight="700" fill="#9a560f">PyTorch Profiler</text>
-  <text x="788" y="149" font-family="system-ui, sans-serif" font-size="12" font-weight="650" fill="#6b7785">PYTORCH AND DEVICE RUNTIME</text>
-  <rect x="788" y="172" width="284" height="42" rx="5" fill="#fff0d9"/><text x="804" y="198" font-family="system-ui, sans-serif" font-size="13" fill="#9a560f">Torch operators and user ranges</text>
+  <text x="788" y="122" font-family="system-ui, sans-serif" font-size="17" font-weight="700" fill="#9a560f">Foreign runtime profiler</text>
+  <text x="788" y="149" font-family="system-ui, sans-serif" font-size="12" font-weight="650" fill="#6b7785">LIBRARY AND DEVICE RUNTIME</text>
+  <rect x="788" y="172" width="284" height="42" rx="5" fill="#fff0d9"/><text x="804" y="198" font-family="system-ui, sans-serif" font-size="13" fill="#9a560f">native functions and user ranges</text>
   <rect x="788" y="224" width="284" height="42" rx="5" fill="#fff0d9"/><text x="804" y="250" font-family="system-ui, sans-serif" font-size="13" fill="#9a560f">supported kernels and runtime activity</text>
-  <rect x="788" y="276" width="284" height="42" rx="5" fill="#fff0d9"/><text x="804" y="302" font-family="system-ui, sans-serif" font-size="13" fill="#9a560f">tensor memory, shapes, stacks, FLOPs</text>
-  <text x="788" y="342" font-family="ui-monospace, monospace" font-size="12" fill="#58677a">profile · record_function · step</text>
+  <rect x="788" y="276" width="284" height="42" rx="5" fill="#fff0d9"/><text x="804" y="302" font-family="system-ui, sans-serif" font-size="13" fill="#9a560f">stacks, allocations, operators, or FLOPs</text>
+  <text x="788" y="342" font-family="ui-monospace, monospace" font-size="12" fill="#58677a">perf · PyTorch Profiler · Nsight</text>
 
   <line x1="190" y1="386" x2="930" y2="386" stroke="#aeb8c4" stroke-width="2"/>
   <circle cx="190" cy="386" r="6" fill="#294d73"/><circle cx="560" cy="386" r="6" fill="#187d75"/><circle cx="930" cy="386" r="6" fill="#ba6b18"/>

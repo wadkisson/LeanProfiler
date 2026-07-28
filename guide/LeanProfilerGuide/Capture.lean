@@ -14,40 +14,36 @@ open Verso.Genre Manual
 tag := "capture"
 %%%
 
-The first trace separated input loading from the model's forward pass. That was enough to locate
-the larger interval, but not enough to compare different steps, modules, devices, or backends. The
-next capture should add that context without turning every observation into a different event.
+The first trace separated source reading from source analysis. That was enough to locate the larger
+interval, but not enough to compare files, modules, or implementations. The next capture should add
+that context without turning every observation into a different event.
 
 Suppose the measured loop looks like this:
 
 ```
-let mut parameters := initialParameters
-for step in List.range steps do
-  let batch ← loadBatch step
-  let prediction ← model.forward batch
-  let loss := objective prediction batch.targets
-  let gradients ← backward loss
-  parameters ← optimizer.step parameters gradients
+for (sourcePath, fileIndex) in sourcePaths.zipIdx do
+  let contents ← readSource sourcePath
+  let syntax ← parseSource contents
+  let declarations ← analyzeSource syntax
+  writeIndex sourcePath declarations
 ```
 
-The useful boundaries are already visible in the program: loading, forward evaluation, backward
-evaluation, and the optimizer update. Start with those four names. A layer name, step number,
-device, or tensor shape describes the circumstances of one call; it should not replace the name of
-the work itself.
+The useful boundaries are already visible in the program: reading, parsing, analysis, and writing.
+Start with those four names. A source path, module name, or iteration number describes the
+circumstances of one call; it should not replace the name of the work itself.
 
 ```
-profileFromEnvironment "training" do
-  for step in List.range steps do
-    withStep step do
-      let batch ← span "batch.load" (loadBatch step)
-      let prediction ← span "model.forward" (model.forward batch)
-      let loss := objective prediction batch.targets
-      let gradients ← span "loss.backward" (backward loss)
-      parameters ← span "optimizer.step" (optimizer.step parameters gradients)
+profileFromEnvironment "indexer.run" do
+  for (sourcePath, fileIndex) in sourcePaths.zipIdx do
+    withStep fileIndex do
+      let contents ← span "source.read" (readSource sourcePath)
+      let syntax ← span "source.parse" (parseSource contents)
+      let declarations ← span "source.analyze" (analyzeSource syntax)
+      span "index.write" (writeIndex sourcePath declarations)
 ```
 
-This hierarchy remains readable in a ten-step experiment and a ten-thousand-step run. Repeated
-calls share summary rows, while the trace still preserves every recorded step.
+This hierarchy remains readable with ten files or ten thousand. Repeated calls share summary rows,
+while the trace still preserves every recorded file index.
 
 # Keep names stable and put variation in metadata
 %%%
@@ -58,17 +54,12 @@ An event name answers “what work was this?” Metadata answers “under which 
 name makes runs comparable even when the module, shape, or backend changes.
 
 ```
-span "model.forward" runAttention (metadata := {
-  phase := some "forward"
-  activity := some "operator"
-  backend := some backendName
-  dtype := some dtypeName
-  device := some deviceName
-  moduleName := some "encoder.block.0"
-  graphNode := some nodeName
-  stepIndex := some step
-  inputShapes := #[inputShape]
-  outputShapes := #[outputShape]
+span "source.analyze" (analyzeSource syntax) (metadata := {
+  phase := some "analysis"
+  activity := some "source file"
+  backend := some analyzerName
+  moduleName := some moduleName
+  stepIndex := some fileIndex
 })
 ```
 
@@ -78,14 +69,13 @@ LeanProfiler uses the following fields as the summary key:
 name, phase, activity, backend, dtype, device, module
 ```
 
-Those fields split rows because they commonly identify meaningfully different implementations. A
-CPU and CUDA forward pass should not be averaged together, and neither should two modules whose
-costs need to be compared.
+All of these fields are optional. They split rows when they identify meaningfully different
+implementations. Two analyzers should not be averaged together, and neither should two modules
+whose costs need to be compared. Numerical programs can additionally use dtype and device.
 
-Step, graph node, and shape arrays remain attached to individual trace events. Putting a step
-number in the grouping key would create one summary row per iteration. Putting arbitrary shapes in
-the key could do the same for variable-length inputs. The trace is where those details belong; the
-summary is where repeated observations become a distribution.
+Step, graph node, and shape arrays remain attached to individual trace events. Putting a step number
+in the grouping key would create one summary row per iteration. The trace is where per-call details
+belong; the summary is where repeated observations become a distribution.
 
 When another dimension really does define a separate benchmark population, use a stable name or
 one of the grouping fields deliberately. Do not encode an entire JSON payload into an event name.
@@ -98,20 +88,16 @@ tag := "metadata-context"
 Most labels repeat across several nested spans. Dynamic context records them once:
 
 ```
-for step in List.range steps do
-  withStep step do
-    span "batch.load" (loadBatch step) (metadata := {
-      activity := some "data"
+for (sourcePath, fileIndex) in sourcePaths.zipIdx do
+  withStep fileIndex do
+    span "source.read" (readSource sourcePath) (metadata := {
+      activity := some "filesystem"
     })
 
-    withModule "encoder.block.0" do
-      withPhase "forward" do
-        span "model.forward" (model.forward batch) (metadata := {
-          backend := some backendName
-          dtype := some dtypeName
-          device := some deviceName
-          inputShapes := #[inputShape]
-          outputShapes := #[outputShape]
+    withModule moduleName do
+      withPhase "analysis" do
+        span "source.analyze" (analyzeSource syntax) (metadata := {
+          backend := some analyzerName
         })
 ```
 
@@ -133,17 +119,17 @@ the session it clears old events and enables recording. At the end it disables r
 the event structure, computes summary rows, and writes both artifacts.
 
 ```
-def profileTraining (config : ProfilerConfig) : IO Unit :=
-  profile config "training" do
-    runTrainingLoop
+def profileIndexer (config : ProfilerConfig) : IO Unit :=
+  profile config "indexer.run" do
+    buildIndex
 ```
 
 Nested `span` calls are normal. Nested or overlapping `profile` calls are rejected because two
 sessions cannot safely own the same process-wide buffer or output paths.
 
-The session also preserves the failure that matters. If `runTrainingLoop` throws, LeanProfiler
+The session also preserves the failure that matters. If `buildIndex` throws, LeanProfiler
 first attempts to export the completed spans and then rethrows the original exception. If export
-fails as well, the export error is printed, but it does not hide the training failure. A partial
+fails as well, the export error is printed, but it does not hide the indexing failure. A partial
 trace from a failed run is useful diagnostic evidence; it is not automatically a valid benchmark.
 
 # Wait for worker tasks that belong to the run
@@ -199,36 +185,36 @@ counters without adding their collection cost to the duration.
 
 ```
 let hooks : SpanHooks := {
-  State := DeviceToken
+  State := AsyncToken
   prepare := makeTimingToken
-  completeTiming := waitForDevice
+  completeTiming := waitForRuntime
   enrich := fun token metadata => do
     let live ← readLiveBytes token
     pure { metadata with allocLiveBytes := some live }
 }
 
-span "model.forward" forward
+span "foreign.compute" submitWork
   (metadata := {
-    device := some "cuda"
-    timing := some "device-synchronized"
+    backend := some runtimeName
+    timing := some "runtime-synchronized"
   })
   (hooks := hooks)
 ```
 
-This span measures the host launch path, queue delay, required device work, and synchronization
-overhead as one interval. It does not reveal individual kernels or memory copies. CUPTI, Kineto, or
-a native device profiler is still needed for that lower-level timeline.
+This span measures the host launch path, queue delay, required asynchronous work, and
+synchronization overhead as one interval. It does not reveal work inside the foreign runtime. Use
+that runtime's own profiler when the next question lies below the boundary.
 
 Errors from `completeTiming` and `enrich` are written to `metadata.hookError`. They do not replace
-an exception raised by `forward`. An error from `prepare` occurs before the event is reserved and
-returns directly to the caller.
+an exception raised by `submitWork`. An error from `prepare` occurs before the event is reserved
+and returns directly to the caller.
 
 # Keep long captures finite
 %%%
 tag := "event-limits"
 %%%
 
-A trace of every operation in a long training run can consume substantial memory and become harder
+A trace of every operation in a long-running program can consume substantial memory and become harder
 to inspect than the program itself. Set a retained-event limit when the workload is not naturally
 small:
 
@@ -277,19 +263,19 @@ should never be displayed or compared as zero.
 tag := "capture-result"
 %%%
 
-After these choices, one step of the training capture has a clear structure:
+After these choices, one file in the indexing capture has a clear structure:
 
 ```
-training
-├── batch.load                 step=17, activity=data
-├── model.forward              step=17, module=encoder.block.0
-│                              backend=eager, device=cuda
-├── loss.backward              step=17, phase=backward
-└── optimizer.step             step=17, phase=optimizer
+indexer.run
+├── source.read                step=17, activity=filesystem
+├── source.parse               step=17, phase=parse
+├── source.analyze             step=17, module=Project.Parser
+│                              backend=incremental
+└── index.write                step=17, phase=output
 ```
 
 `withStep` supplies metadata; it does not create another span. The trace therefore keeps step 17 on
 each event while preserving the actual parent relationships. The summary combines repeated steps
-under stable keys. The synchronized forward interval states what completion means, and any memory
+under stable keys. A synchronized foreign interval states what completion means, and any memory
 fields come from an identified adapter. Nothing in the report has to be interpreted as an
 unlabelled convention.

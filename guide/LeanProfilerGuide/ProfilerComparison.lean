@@ -13,12 +13,12 @@ open Verso.Genre Manual
 tag := "profiler-comparison"
 %%%
 
-A model command can be slow in three distinct places. Lean may spend time elaborating and compiling
-the program. The running application may spend time loading data, building a graph, or waiting at a
-foreign boundary. A framework or accelerator may spend time in operators, memory copies, and
-kernels. No single profiler sees all three.
+A Lean command can be slow in three distinct places. Lean may spend time elaborating and compiling
+the program. The running application may spend time reading data, searching, serving requests, or
+waiting at a foreign boundary. A library or device runtime may spend time in native functions,
+memory copies, and kernels. No single profiler sees all three.
 
-![The observation boundaries of Lean profiling tools, LeanProfiler, and PyTorch Profiler](../../Assets/profiler-scope.svg)
+![The observation boundaries of Lean profiling tools, LeanProfiler, and a foreign runtime profiler](../../Assets/profiler-scope.svg)
 
 The views can support one investigation, but their events and timing columns answer different
 questions.
@@ -70,24 +70,23 @@ Two smaller tools answer local questions:
 - `IO.allocprof` invokes Lean's runtime allocation-profiler hook.
 
 These local timers answer a different question from an application profile. A file can elaborate
-quickly while its executable spends minutes in a training loop.
+quickly while its executable spends minutes serving requests or searching a state space.
 
 # After `main`: LeanProfiler
 %%%
 tag := "runtime-measurement-sources"
 %%%
 
-LeanProfiler measures boundaries chosen by the Lean application. A training loop can use names that
-do not exist inside the compiler or a foreign framework:
+LeanProfiler measures boundaries chosen by the Lean application. A source indexer can use names
+that do not exist inside the compiler or a foreign library:
 
 ```
-profileFromEnvironment "training" do
-  for step in List.range steps do
-    withStep step do
-      span "batch.load" loadBatch
-      span "model.forward" forward
-      span "loss.backward" backward
-      span "optimizer.step" optimizerStep
+profileFromEnvironment "indexer.run" do
+  for (sourcePath, fileIndex) in sourcePaths.zipIdx do
+    withStep fileIndex do
+      let contents ← span "source.read" (readSource sourcePath)
+      let syntax ← span "source.parse" (parseSource contents)
+      span "source.analyze" (analyzeSource syntax)
 ```
 
 Its measurements come from Lean and `Std` runtime APIs:

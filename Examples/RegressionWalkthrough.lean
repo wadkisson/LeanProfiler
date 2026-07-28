@@ -13,7 +13,7 @@ import LeanProfiler
 # Regression walkthrough
 
 Records baseline and candidate runs of the same nested workload, then compares their p95 values.
-The candidate changes only the delay inside `model.forward`, so the expected regression has a known
+The candidate changes only the delay inside `source.analyze`, so the expected regression has a known
 source.
 -/
 
@@ -47,10 +47,10 @@ public def run : IO Unit := do
   IO.FS.createDirAll artifactDirectory
   NestedWorkload.run
     (profilerConfig "baseline" "LeanProfiler regression baseline")
-    { steps := 3, loadDelayMs := 2, forwardDelayMs := 4 }
+    { steps := 3, readDelayMs := 2, analyzeDelayMs := 4 }
   NestedWorkload.run
     (profilerConfig "candidate" "LeanProfiler regression candidate")
-    { steps := 3, loadDelayMs := 2, forwardDelayMs := 10 }
+    { steps := 3, readDelayMs := 2, analyzeDelayMs := 10 }
 
   let baseline ← readSummaryArtifact (artifactDirectory / "baseline-summary.json")
   let candidate ← readSummaryArtifact (artifactDirectory / "candidate-summary.json")
@@ -59,7 +59,7 @@ public def run : IO Unit := do
   IO.FS.writeFile comparisonPath (Json.pretty comparison.toJson ++ "\n")
 
   unless comparison.hasRegression do
-    throw <| IO.userError "expected the slower model.forward candidate to be a regression"
+    throw <| IO.userError "expected the slower source.analyze candidate to be a regression"
   let regressionCount :=
     (comparison.matched.filter fun row => row.status == .regression).size
   IO.println s!"Recorded baseline and candidate under {artifactDirectory}"

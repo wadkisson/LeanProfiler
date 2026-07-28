@@ -1,18 +1,39 @@
 # LeanProfiler
 
-A Lean executable can be slow for reasons the compiler never sees: a data loader stalls, one phase
-of a training loop grows, a foreign call blocks, or an accelerator finishes later than its launch.
-A stopwatch around the whole command confirms the delay but does not locate it.
+Runtime profiling for Lean programs.
 
-LeanProfiler lets the running program mark boundaries such as `batch.load`, `model.forward`, and
-`optimizer.step`. Each capture produces:
+## Why it exists
+
+Lean's compiler profilers are the right tools when a file is slow to elaborate or type-check. Once
+an executable starts, a different set of costs appears: reading files, parsing input, running a
+search, serving requests, evaluating numerical code, waiting for worker tasks, or calling a foreign
+runtime. Timing the whole command confirms that it is slow, but does not show which phase changed.
+
+`IO.timeit` is useful for one measurement, while a system profiler resolves low-level functions.
+LeanProfiler records the names that the program gives to its own phases. Each `IO` span keeps its
+order, nesting, thread, metadata, elapsed time, Lean heartbeats, and process counters. The result is
+a timeline for diagnosis and a summary that can be compared with another run.
+
+The API works in command-line tools, servers, search programs, data pipelines, numerical
+applications, and ML workloads. The core package has no dependency on TorchLean, PyTorch, or a
+device runtime.
+
+Use the tool that matches the question:
+
+| Question | Tool |
+| --- | --- |
+| Why is a Lean file slow to elaborate or compile? | Lean's `--profile`, [component profiler](https://lean-lang.org/doc/api/Lean/Util/Profile.html), and [trace profiler](https://lean-lang.org/doc/api/Lean/Util/Trace.html) |
+| Which phase of a running Lean executable is slow? | LeanProfiler |
+| What happens inside a C, PyTorch, or device call? | The profiler for that runtime, alongside an outer LeanProfiler span |
+
+Each capture produces:
 
 - a Trace Event file that opens in [Perfetto](https://ui.perfetto.dev);
 - a strict JSON summary with integer-nanosecond timings, grouped rows, heartbeats, and process
   counters.
 
-The trace preserves order, nesting, threads, and metadata. The summary aggregates repeated work and
-can compare a candidate run against a baseline.
+The trace is for diagnosis. The summary aggregates repeated work and supports baseline-to-candidate
+comparisons in scripts or CI.
 
 ![A LeanProfiler investigation from a performance question to a diagnosis or regression gate](guide/LeanProfilerGuide/Assets/profiling-workflow.svg)
 
@@ -32,15 +53,22 @@ import LeanProfiler
 
 open LeanProfiler
 
+def readSource : IO String := do
+  IO.sleep 2
+  pure "def answer := 42"
+
+def analyzeSource (source : String) : IO Nat := do
+  IO.sleep 4
+  pure source.length
+
 def main : IO Unit :=
-  profileFromEnvironment "application" do
-    span "batch.load" loadBatch
-    span "model.forward" forward (metadata := {
-      phase := some "forward"
-      backend := some "eager"
-      dtype := some "float32"
-      device := some "cpu"
+  profileFromEnvironment "indexer.run" do
+    let source ← span "source.read" readSource
+    let declarations ← span "source.analyze" (analyzeSource source) (metadata := {
+      phase := some "analysis"
+      moduleName := some "indexer"
     })
+    IO.println s!"indexed {declarations} characters"
 ```
 
 Run it with profiling enabled:
@@ -88,7 +116,7 @@ baseline-to-regression walkthrough.
 
 ## What the output looks like
 
-![A nested timeline with one root span and alternating input.load and model.forward child spans](guide/LeanProfilerGuide/Assets/nested-spans-timeline.svg)
+![A nested timeline with one root span and alternating source.read and source.analyze child spans](guide/LeanProfilerGuide/Assets/nested-spans-timeline.svg)
 
 The timeline shows the order, duration, and nesting of every recorded span.
 
@@ -112,10 +140,10 @@ A candidate increase is a regression only when it exceeds both tolerances. New a
 are reported separately. Invalid or incomplete summaries are rejected unless the caller requests a
 diagnostic comparison.
 
-## TorchLean
+## Optional TorchLean integration
 
-TorchLean programs can import the core package directly. A separate package contains a command
-runner and MLP training walkthrough:
+TorchLean is one application of the general API. TorchLean programs can import the core package
+directly, while a separate package provides a command runner, CUDA hooks, and an MLP walkthrough:
 
 ```sh
 cd integrations/TorchLean

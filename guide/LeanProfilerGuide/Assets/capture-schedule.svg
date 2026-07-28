@@ -22,5 +22,5 @@
   <rect x="944" y="88" width="66" height="62" rx="6" fill="#e9f5f3"/><text x="977" y="115" text-anchor="middle" font-family="system-ui, sans-serif" font-size="12" fill="#145f59">record</text><text x="977" y="137" text-anchor="middle" font-family="ui-monospace, monospace" font-size="11" fill="#145f59">12</text>
   <rect x="1016" y="88" width="70" height="62" rx="6" fill="#187d75"/><text x="1051" y="115" text-anchor="middle" font-family="system-ui, sans-serif" font-size="12" font-weight="650" fill="#ffffff">save</text><text x="1051" y="137" text-anchor="middle" font-family="ui-monospace, monospace" font-size="11" fill="#ffffff">13</text>
   <text x="24" y="205" font-family="system-ui, sans-serif" font-size="13" fill="#425466">Warmup executes the workload without retaining measurements. Each save step closes one active capture.</text>
-  <text x="24" y="228" font-family="system-ui, sans-serif" font-size="12" fill="#58677a">The schedule decides when to measure; the surrounding loop still owns the model state and workload.</text>
+  <text x="24" y="228" font-family="system-ui, sans-serif" font-size="12" fill="#58677a">The schedule decides when to measure; the surrounding loop still owns the application state and workload.</text>
 </svg>

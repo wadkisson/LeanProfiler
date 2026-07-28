@@ -11,31 +11,31 @@ public import LeanProfiler
 /-!
 # Nested example workload
 
-Shared workload used by the introductory trace and regression walkthrough.
+Shared source-indexing workload used by the introductory trace and regression walkthrough.
 -/
 
 namespace LeanProfiler.Examples.NestedWorkload
 
-/-- Step count and delays for the nested-span example. -/
+/-- Source count and phase delays for the nested-span example. -/
 public structure WorkloadConfig where
   steps : Nat := 3
-  loadDelayMs : UInt32 := 2
-  forwardDelayMs : UInt32 := 4
+  readDelayMs : UInt32 := 2
+  analyzeDelayMs : UInt32 := 4
 
-/-- Record one input and forward pair under shared step context. -/
+/-- Record reading and analyzing one source under shared step context. -/
 def runStep (config : WorkloadConfig) (step : Nat) : IO Unit :=
   withStep step do
-    span "input.load" (IO.sleep config.loadDelayMs) (metadata := {
-      phase := some "input"
-      activity := some "load"
+    span "source.read" (IO.sleep config.readDelayMs) (metadata := {
+      phase := some "read"
+      activity := some "filesystem"
     })
-    withModule "encoder.block" do
-      withPhase "forward" do
-        span "model.forward" (IO.sleep config.forwardDelayMs)
+    withModule "indexer" do
+      withPhase "analysis" do
+        span "source.analyze" (IO.sleep config.analyzeDelayMs)
 
 /-- Run the example workload under one profiling session. -/
 public def run (profiler : ProfilerConfig) (workload : WorkloadConfig := {}) : IO Unit :=
-  profile profiler "example.nested-spans" do
+  profile profiler "example.source-indexer" do
     for step in List.range workload.steps do
       runStep workload step
 

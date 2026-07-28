@@ -16,8 +16,8 @@ tag := "regressions"
 %%%
 
 Now change exactly one part of the running example. The baseline spends about four milliseconds in
-each `model.forward` span; the candidate spends ten. Both captures retain three steps and keep the
-two-millisecond input delay unchanged.
+each `source.analyze` span; the candidate spends ten. Both captures retain three files and keep the
+two-millisecond read delay unchanged.
 
 Generate both captures and their comparison:
 
@@ -38,8 +38,8 @@ lake exe leanprofiler compare \
   --json build/regression-walkthrough/comparison.json
 ```
 
-The candidate crosses both allowances for `model.forward` and for the enclosing root span. The
-input row stays effectively unchanged, which is the evidence that localizes the regression:
+The candidate crosses both allowances for `source.analyze` and for the enclosing root span. The
+read row stays effectively unchanged, which is the evidence that localizes the regression:
 
 ![A paired-dot plot comparing baseline and candidate p95 values for the three nested example rows](../../Assets/p95-comparison.svg)
 
@@ -101,9 +101,9 @@ let ran ← runScheduledCycle schedule cycle config captureName fun step action 
   runStep step action
 ```
 
-Skipped, waiting, and warmup callbacks run before capture begins. They still change model and
-runtime state, so the active interval begins from the same state the unprofiled training loop would
-have reached. Give every retained cycle its own trace and summary paths.
+Skipped, waiting, and warmup callbacks run before capture begins. They can still change application
+state, so the active interval begins from the same state the unprofiled loop would have reached.
+Give every retained cycle its own trace and summary paths.
 
 The schedule lemmas establish its boundary behavior:
 

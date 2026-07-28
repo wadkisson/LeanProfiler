@@ -14,11 +14,11 @@ open Verso.Genre Manual
 tag := "getting-started"
 %%%
 
-Start with the few boundaries you would name while explaining the program to another person. For a
-training step, those may be loading, forward evaluation, backward evaluation, and the optimizer.
-For a server request, they may be parsing, lookup, computation, and serialization. A handful of
-broad spans is easier to read than hundreds of tiny events, and it usually makes the next question
-obvious.
+Start with the few boundaries you would name while explaining the program to another person. A file
+indexer may have discovery, parsing, and writing phases. A server request may have parsing, lookup,
+computation, and serialization. A training step may have loading, forward evaluation, backward
+evaluation, and an optimizer update. A handful of broad spans is easier to read than hundreds of
+tiny events, and it usually makes the next question obvious.
 
 Add LeanProfiler to the Lake package that owns the executable:
 
@@ -36,21 +36,19 @@ import LeanProfiler
 
 open LeanProfiler
 
-def loadBatch : IO Unit :=
+def readSource : IO Unit :=
   IO.sleep 2
 
-def runForward : IO Unit :=
+def analyzeSource : IO Unit :=
   IO.sleep 4
 
 def main : IO Unit :=
-  profileFromEnvironment "training.step" do
-    span "input.load" loadBatch
-    span "model.forward" runForward (metadata := {
-      phase := some "forward"
-      backend := some "eager"
-      dtype := some "float32"
-      device := some "cpu"
-      inputShapes := #["32×784"]
+  profileFromEnvironment "indexer.run" do
+    span "source.read" readSource
+    span "source.analyze" analyzeSource (metadata := {
+      phase := some "analysis"
+      activity := some "source file"
+      moduleName := some "indexer"
     })
 ```
 
@@ -79,13 +77,14 @@ still have measurement overhead, so capture only the interval and detail needed 
 The session above produces a root event with two children:
 
 ```
-training.step
-├── input.load
-└── model.forward
+indexer.run
+├── source.read
+└── source.analyze
 ```
 
-That small hierarchy already distinguishes a slow loader from a slow model call. Nest narrower
-spans only after the first trace points to one of them.
+That small hierarchy already distinguishes slow file access from slow analysis. A server, theorem
+search, simulator, or training loop would use names from its own domain. Nest narrower spans only
+after the first trace points to one of them.
 
 # Use an explicit configuration
 %%%
@@ -171,15 +170,15 @@ LEAN_PROFILE=1 lake exe leanprofiler_nested_example
 It records this pair three times:
 
 ```
-example.nested-spans
-├── input.load
-└── model.forward
+example.source-indexer
+├── source.read
+└── source.analyze
 ```
 
-The load span carries an input phase and activity. The forward span carries a forward phase and
-module name. Step numbers remain on individual trace events, while the three repeated calls share
-one summary row. This distinction is important: the timeline preserves each observation, while the
-summary provides the distribution used for comparisons.
+The read span records its phase and filesystem activity. The analysis span records its phase and
+component name. Step numbers remain on individual trace events, while the three repeated calls
+share one summary row. The timeline preserves each observation; the summary provides the
+distribution used for comparisons.
 
 The other examples cover two boundaries that are easy to miss:
 
@@ -209,7 +208,7 @@ import LeanProfiler.Syntax
 
 open LeanProfiler
 
-profiled def loadBatch : IO Unit := do
+profiled def readSource : IO Unit := do
   IO.sleep 2
 ```
 

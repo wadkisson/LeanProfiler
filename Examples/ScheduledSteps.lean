@@ -26,8 +26,8 @@ structure WorkloadConfig where
   delayMs : UInt32 := 2
   captureName : String := "example.scheduled-steps"
 
-/-- Simulate one model step for the configured duration. -/
-def runModelStep (config : WorkloadConfig) : IO Unit :=
+/-- Simulate one application step for the configured duration. -/
+def runWorkStep (config : WorkloadConfig) : IO Unit :=
   IO.sleep config.delayMs
 
 /-- Validate the schedule stored in the example's workload configuration. -/
@@ -42,12 +42,12 @@ def run (profiler : ProfilerConfig) (workload : WorkloadConfig := {}) : IO Unit 
   let _ ← runScheduledCycle schedule 0 profiler workload.captureName fun step action =>
     if action.records then
       withStep step do
-        span "training.step" (runModelStep workload) (metadata := {
-          phase := some "train"
+        span "work.step" (runWorkStep workload) (metadata := {
+          phase := some "active"
           activity := some (if action.saves then "record and save" else "record")
         })
     else
-      runModelStep workload
+      runWorkStep workload
   pure ()
 
 end LeanProfiler.Examples.ScheduledSteps
