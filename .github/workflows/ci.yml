@@ -90,6 +90,7 @@ jobs:
           done
           for chapter in \
             Record-your-first-run \
+            How-a-span-becomes-a-report \
             Design-the-capture \
             Read-the-trace-and-summary \
             Compare-two-runs \

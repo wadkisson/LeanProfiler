@@ -15,6 +15,13 @@ Runs TorchLean's focused CUDA kernel, autograd, numerical-parity, shape, ownersh
 checks without first running unrelated dataset or Python interoperability suites.
 -/
 
-/-- Run the CUDA coverage suite selected by the current TorchLean native build. -/
-public def main : IO Unit :=
-  Tests.Cuda.run
+/--
+Run the CUDA coverage suite selected by the current TorchLean native build.
+
+The allocator cache-cap test re-executes this binary with a fixed native environment. Its child
+must run only the cache probe; entering the full suite again would recursively fork more children.
+-/
+public def main : IO Unit := do
+  match ← IO.getEnv "TORCHLEAN_CUDA_CACHE_PROBE" with
+  | some "cache-cap" => Tests.Cuda.Stress.runCacheCapProbe
+  | _ => Tests.Cuda.run

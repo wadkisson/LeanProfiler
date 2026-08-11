@@ -1,22 +1,22 @@
 # LeanProfiler
 
-Runtime profiling for Lean programs.
+Application-level runtime profiling for compiled Lean programs.
 
 ## Why it exists
 
-Lean's compiler profilers are the right tools when a file is slow to elaborate or type-check. Once
-an executable starts, a different set of costs appears: reading files, parsing input, running a
-search, serving requests, evaluating numerical code, waiting for worker tasks, or calling a foreign
-runtime. Timing the whole command confirms that it is slow, but does not show which phase changed.
+LeanProfiler grew out of an awkward gap in Lean's performance tooling. Lean already has good tools
+for finding an expensive declaration or tactic, but their job is largely over by the time `main`
+begins. A compiled program may then spend its time reading files, exploring a search tree, serving
+requests, waiting for workers, running numerical code, or crossing into another runtime.
 
-`IO.timeit` is useful for one measurement, while a system profiler resolves low-level functions.
-LeanProfiler records the names that the program gives to its own phases. Each `IO` span keeps its
-order, nesting, thread, metadata, elapsed time, Lean heartbeats, and process counters. The result is
-a timeline for diagnosis and a summary that can be compared with another run.
+Imagine a source indexer that used to finish in ten seconds and now takes thirty. A stopwatch proves
+that it regressed. A system profiler can identify hot native functions. Neither result answers the
+question the programmer is likely to ask first: did discovery, parsing, analysis, or writing become
+slower? LeanProfiler lets the program name those phases directly, then records their order,
+nesting, thread, metadata, elapsed time, and Lean heartbeats.
 
-The API works in command-line tools, servers, search programs, data pipelines, numerical
-applications, and ML workloads. The core package has no dependency on TorchLean, PyTorch, or a
-device runtime.
+The core package is for any compiled Lean application. TorchLean is a useful stress case, but it is
+an optional integration rather than a dependency of the profiler.
 
 Use the tool that matches the question:
 
@@ -24,7 +24,34 @@ Use the tool that matches the question:
 | --- | --- |
 | Why is a Lean file slow to elaborate or compile? | Lean's `--profile`, [component profiler](https://lean-lang.org/doc/api/Lean/Util/Profile.html), and [trace profiler](https://lean-lang.org/doc/api/Lean/Util/Trace.html) |
 | Which phase of a running Lean executable is slow? | LeanProfiler |
-| What happens inside a C, PyTorch, or device call? | The profiler for that runtime, alongside an outer LeanProfiler span |
+| Which PyTorch operator or supported device kernel is expensive? | [PyTorch Profiler](https://docs.pytorch.org/docs/stable/profiler.html), inside an outer LeanProfiler span when Lean owns the application |
+| Which native function is expensive? | A system or runtime profiler, with LeanProfiler retaining the application context |
+
+## From one span to a report
+
+The common case is small:
+
+```lean
+profileFromEnvironment "indexer.run" do
+  let source ← span "source.read" readSource
+  span "source.analyze" (analyzeSource source)
+```
+
+When profiling is enabled, `profileFromEnvironment` claims the process-wide capture buffer and
+opens the root event. Each `span` then follows the same path:
+
+1. reserve an event index under a mutex and read the current thread's parent stack;
+2. sample the monotonic clock and the thread's Lean heartbeat counter;
+3. run the action, including any completion hook needed for asynchronous work;
+4. take the ending samples and store the completed event;
+5. restore the stack even when the action throws.
+
+At the end of the session, the analyzer validates the event forest. It computes inclusive time
+from the recorded interval and self time by subtracting the covered union of immediate,
+same-thread children. Cross-thread children stay linked in the trace but are not subtracted from
+another thread's clock. Repeated events are grouped by their structured key, and the report keeps
+call counts, total and self time, min/mean/median/p95/max, heartbeats, and supplied allocator
+counters.
 
 Each capture produces:
 
@@ -32,8 +59,12 @@ Each capture produces:
 - a strict JSON summary with integer-nanosecond timings, grouped rows, heartbeats, and process
   counters.
 
-The trace is for diagnosis. The summary aggregates repeated work and supports baseline-to-candidate
-comparisons in scripts or CI.
+The trace answers "what happened, and in what order?" The summary answers "which repeated phase
+changed?" It is a strict, versioned input for baseline-to-candidate comparisons in scripts or CI.
+
+LeanProfiler does not discover functions, operators, or kernels automatically. The application
+chooses its spans. That is the reason the output can retain names such as `source.analyze`,
+`solver.expand`, or `training.step` even when the implementation crosses several libraries.
 
 ![A LeanProfiler investigation from a performance question to a diagnosis or regression gate](guide/LeanProfilerGuide/Assets/profiling-workflow.svg)
 
@@ -104,15 +135,23 @@ loading Lean's compiler front end into an ordinary runtime executable.
 
 ## Try the examples
 
+The examples are small enough to read before running them:
+
+- `leanprofiler_nested_example` records a source-indexing loop with nested phase and module context.
+- `leanprofiler_async_example` waits for a worker task before closing the measured interval.
+- `leanprofiler_schedule_example` records only the active part of a longer stepped workload.
+- `leanprofiler_regression_example` captures a baseline and a deliberately slower candidate, then
+  checks their p95 summaries.
+
+Enable capture for the first three with `LEAN_PROFILE=1`. The regression walkthrough supplies its
+own output paths and profiling configuration, so it runs directly:
+
 ```sh
 LEAN_PROFILE=1 lake exe leanprofiler_nested_example
 LEAN_PROFILE=1 lake exe leanprofiler_async_example
 LEAN_PROFILE=1 lake exe leanprofiler_schedule_example
 lake exe leanprofiler_regression_example
 ```
-
-The examples cover nested metadata, asynchronous completion, scheduled active steps, and a complete
-baseline-to-regression walkthrough.
 
 ## What the output looks like
 
