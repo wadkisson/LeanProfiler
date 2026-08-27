@@ -71,7 +71,7 @@ LEAN_PROFILE=1 \
 LEAN_PROFILE_OUT=build/cuda-mlp-trace.json \
 LEAN_PROFILE_SUMMARY_OUT=build/cuda-mlp-summary.json \
 lake -R -K cuda=true exe leanprofiler_torchlean \
-  quickstart_mlp --device cuda --backend eager --dtype float --steps 3
+  quickstart_mlp --device cuda --execution eager --scalar float32 --steps 3
 ```
 
 An explicit `--device cuda` selects `LeanProfiler.TorchLean.Cuda.spanHooks`. Before the model runs,

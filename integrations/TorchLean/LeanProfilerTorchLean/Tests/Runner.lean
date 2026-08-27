@@ -24,11 +24,12 @@ def expect (label : String) (condition : Bool) : IO Unit :=
 
 /-- Check that the integration delegates recognized and unknown model commands correctly. -/
 public def run : IO Unit := do
-  let splitArgs := ["quickstart_mlp", "--device", "cuda", "--backend=eager", "--dtype", "float"]
+  let splitArgs :=
+    ["quickstart_mlp", "--device", "cuda", "--execution=eager", "--scalar", "float32"]
   let metadata := LeanProfiler.TorchLean.CommandMetadata.fromArguments splitArgs
   expect "split device flag" (metadata.device == some "cuda")
-  expect "inline backend flag" (metadata.backend == some "eager")
-  expect "split dtype flag" (metadata.dtype == some "float")
+  expect "inline execution flag" (metadata.backend == some "eager")
+  expect "split scalar flag" (metadata.dtype == some "float32")
   expect "CUDA selection" (LeanProfiler.TorchLean.CommandMetadata.usesCuda splitArgs)
   expect "CPU does not select CUDA"
     (!LeanProfiler.TorchLean.CommandMetadata.usesCuda ["--device=cpu"])

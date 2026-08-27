@@ -39,11 +39,11 @@ public structure WorkloadConfig where
 def modelMetadata : Metadata :=
   {
     backend := some "eager"
-    dtype := some "float"
+    dtype := some "float32"
     device := some "cpu"
     moduleName := some "quickstart.simple-mlp"
-    inputShapes := #[nn.shapeDisplay (.dim inDim .scalar)]
-    outputShapes := #[nn.shapeDisplay (.dim outDim .scalar)]
+    inputShapes := #[Shape.pretty (.dim inDim .scalar)]
+    outputShapes := #[Shape.pretty (.dim outDim .scalar)]
   }
 
 /-- Profile one training run and repeated predictions with TorchLean's quickstart MLP. -/
@@ -51,8 +51,8 @@ public def run (profiler : ProfilerConfig) (workload : WorkloadConfig := {}) : I
   let trainer := Trainer.new model {
     task := .regression
     optimizer := optim.adam { lr := 0.03 }
-    dtype := .float
-    backend := .eager
+    scalar := .float32
+    execution := .eager
     seed := workload.seed
   }
   IO.println "== TorchLean MLP profile =="
@@ -70,8 +70,7 @@ public def run (profiler : ProfilerConfig) (workload : WorkloadConfig := {}) : I
           phase := some "training"
           activity := some "training run"
         })
-      let heldout : Tensor.T Float (.dim inDim .scalar) :=
-        tensorOfList! [2] [0.25, -0.75]
+      let heldout : Tensor Float [inDim] := tensor! [0.25, -0.75]
       -- Warmups are excluded from the inference latency row.
       for _ in List.range workload.warmupRuns do
         let _ ← trained.predict heldout

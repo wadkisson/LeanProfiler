@@ -34,8 +34,8 @@ public def optionValue? (flag : String) : List String → Option String
 public def fromArguments (args : List String) : Metadata :=
   {
     activity := some "model command"
-    backend := optionValue? "--backend" args
-    dtype := optionValue? "--dtype" args
+    backend := optionValue? "--execution" args
+    dtype := optionValue? "--scalar" args
     device := optionValue? "--device" args
   }
 
